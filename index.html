@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DS Wealth Tracker</title>
+    <meta name="description" content="Personal Financial Management & Net Worth Tracking PWA">
+    <meta name="theme-color" content="#6C63FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DS Wealth">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C63FF'/%3E%3Cstop offset='100%25' stop-color='%23FF6584'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='112' fill='url(%23g)'/%3E%3Ctext x='256' y='310' font-family='Arial' font-size='220' font-weight='800' fill='white' text-anchor='middle'%3EDS%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%236C63FF'/%3E%3Cstop offset='100%25' stop-color='%23FF6584'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='112' fill='url(%23g)'/%3E%3Ctext x='256' y='310' font-family='Arial' font-size='220' font-weight='800' fill='white' text-anchor='middle'%3EDS%3C/text%3E%3C/svg%3E">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- SheetJS for Excel/CSV parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- PDF.js for PDF parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script>
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      }
+    </script>
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="css/app.css?v=3">
+</head>
+<body>
+
+<!-- ===== SPLASH SCREEN ===== -->
+<div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+        <div class="splash-logo">
+            <div class="logo-circle">
+                <span class="logo-text">DS</span>
+            </div>
+        </div>
+        <h1 class="splash-title">DS Wealth Tracker</h1>
+        <p class="splash-subtitle">Your Personal Finance OS</p>
+        <div class="splash-loader">
+            <div class="loader-bar"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== AUTH SECTION ===== -->
+<div id="auth-section" class="auth-section hidden">
+    <!-- Login Page -->
+    <div id="login-page" class="auth-page">
+        <div class="auth-header">
+            <div class="auth-logo">
+                <div class="logo-circle small">
+                    <span class="logo-text">DS</span>
+                </div>
+                <div>
+                    <h1>DS Wealth</h1>
+                    <p>Tracker</p>
+                </div>
+            </div>
+        </div>
+        <div class="auth-card">
+            <h2>Welcome Back</h2>
+            <p class="auth-subtitle">Sign in to your account</p>
+            <form id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="login-email" placeholder="you@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <div class="password-input">
+                        <input type="password" id="login-password" placeholder="Enter password" required>
+                        <button type="button" class="toggle-password" onclick="togglePassword('login-password')">👁</button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="link-btn" onclick="showPage('forgot-page')">Forgot Password?</button>
+                </div>
+                <button type="submit" class="btn-primary btn-full">Sign In</button>
+                <div class="auth-divider"><span>or</span></div>
+                <button type="button" class="btn-secondary btn-full" onclick="showPage('register-page')">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register Page -->
+    <div id="register-page" class="auth-page hidden">
+        <div class="auth-header">
+            <button class="back-btn" onclick="showPage('login-page')">← Back</button>
+        </div>
+        <div class="auth-card">
+            <h2>Create Account</h2>
+            <p class="auth-subtitle">Start tracking your wealth</p>
+            <form id="register-form" class="auth-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="reg-name" placeholder="Your full name" required>
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="reg-email" placeholder="you@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <div class="password-input">
+                        <input type="password" id="reg-password" placeholder="Min 6 characters" required>
+                        <button type="button" class="toggle-password" onclick="togglePassword('reg-password')">👁</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="reg-confirm" placeholder="Confirm password" required>
+                </div>
+                <button type="submit" class="btn-primary btn-full">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Forgot Password Page -->
+    <div id="forgot-page" class="auth-page hidden">
+        <div class="auth-header">
+            <button class="back-btn" onclick="showPage('login-page')">← Back</button>
+        </div>
+        <div class="auth-card">
+            <h2>Reset Password</h2>
+            <p class="auth-subtitle">Enter your email to reset password</p>
+            <form id="forgot-form" class="auth-form">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="forgot-email" placeholder="you@example.com" required>
+                </div>
+                <button type="submit" class="btn-primary btn-full">Send Reset Link</button>
+                <div id="forgot-message" class="message hidden"></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MAIN APP ===== -->
+<div id="app-section" class="app-section hidden">
+
+    <!-- Top Bar -->
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <div class="logo-circle tiny">
+                <span class="logo-text">DS</span>
+            </div>
+            <span class="app-name">DS Wealth</span>
+        </div>
+        <div class="top-bar-right">
+            <button class="icon-btn" onclick="refreshMarketData()" title="Refresh">🔄</button>
+            <button class="icon-btn" onclick="toggleTheme()" title="Toggle Theme" id="theme-toggle">🌙</button>
+            <button class="icon-btn" onclick="showNotifications()" title="Notifications">🔔</button>
+            <button class="icon-btn" onclick="logout()" title="Logout">🚪</button>
+        </div>
+    </header>
+
+    <!-- Page Container -->
+    <main class="page-container">
+
+        <!-- ===== DASHBOARD PAGE ===== -->
+        <div id="page-dashboard" class="page active">
+            <div class="page-header">
+                <h2>Dashboard</h2>
+                <p id="dashboard-greeting">Good morning!</p>
+            </div>
+
+            <!-- Net Worth Card -->
+            <div class="net-worth-card glass-card">
+                <div class="net-worth-label">Total Net Worth</div>
+                <div class="net-worth-value" id="total-net-worth">₹0</div>
+                <div class="net-worth-change" id="net-worth-change">
+                    <span class="change-badge positive">+0.00%</span>
+                    <span class="change-label">Today</span>
+                </div>
+                <div class="net-worth-breakdown">
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Indian Portfolio</span>
+                        <span class="breakdown-value" id="indian-portfolio-value">₹0</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">US Portfolio</span>
+                        <span class="breakdown-value" id="us-portfolio-value">$0</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">RSU Holdings</span>
+                        <span class="breakdown-value" id="rsu-portfolio-value">$0</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Other Assets</span>
+                        <span class="breakdown-value" id="other-assets-value">₹0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="stats-grid">
+                <div class="stat-card glass-card">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Unrealized P&L</div>
+                        <div class="stat-value positive" id="unrealized-pnl">₹0</div>
+                    </div>
+                </div>
+                <div class="stat-card glass-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Realized P&L</div>
+                        <div class="stat-value" id="realized-pnl">₹0</div>
+                    </div>
+                </div>
+                <div class="stat-card glass-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Today's Gain</div>
+                        <div class="stat-value" id="todays-gain">₹0</div>
+                    </div>
+                </div>
+                <div class="stat-card glass-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                        <div class="stat-label">Total Returns</div>
+                        <div class="stat-value" id="total-returns">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card glass-card">
+                    <h3>Asset Allocation</h3>
+                    <div class="chart-container">
+                        <canvas id="asset-allocation-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card glass-card">
+                    <h3>Market Allocation</h3>
+                    <div class="chart-container">
+                        <canvas id="market-allocation-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sector Allocation -->
+            <div class="glass-card">
+                <h3>Sector Allocation</h3>
+                <div class="chart-container tall">
+                    <canvas id="sector-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Holdings -->
+            <div class="glass-card">
+                <h3>Top Holdings</h3>
+                <div id="top-holdings-list" class="holdings-list">
+                    <div class="empty-state">No holdings yet. Upload your portfolio to get started.</div>
+                </div>
+            </div>
+
+            <!-- Portfolio Growth Chart -->
+            <div class="glass-card">
+                <h3>Portfolio Growth</h3>
+                <div class="chart-container">
+                    <canvas id="portfolio-growth-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Exchange Rate -->
+            <div class="glass-card exchange-card">
+                <div class="exchange-info">
+                    <span class="exchange-label">USD/INR Rate</span>
+                    <span class="exchange-value" id="usd-inr-rate">Loading...</span>
+                </div>
+                <div class="exchange-portfolios">
+                    <div>
+                        <span class="exchange-label">US Portfolio (USD)</span>
+                        <span id="us-portfolio-usd">$0</span>
+                    </div>
+                    <div>
+                        <span class="exchange-label">US Portfolio (INR)</span>
+                        <span id="us-portfolio-inr">₹0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== PORTFOLIO PAGE ===== -->
+        <div id="page-portfolio" class="page hidden">
+            <div class="page-header">
+                <h2>Portfolio</h2>
+                <button class="btn-icon-primary" onclick="showAddHoldingModal()">+ Add</button>
+            </div>
+
+            <!-- Portfolio Summary -->
+            <div class="portfolio-summary glass-card">
+                <div class="summary-item">
+                    <span class="summary-label">Invested</span>
+                    <span class="summary-value" id="portfolio-invested">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Current</span>
+                    <span class="summary-value" id="portfolio-current">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">P&L</span>
+                    <span class="summary-value" id="portfolio-pnl">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Returns</span>
+                    <span class="summary-value" id="portfolio-returns">0%</span>
+                </div>
+            </div>
+
+            <!-- Portfolio Tabs -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchPortfolioTab('indian')">🇮🇳 Indian</button>
+                <button class="tab-btn" onclick="switchPortfolioTab('us')">🇺🇸 US</button>
+                <button class="tab-btn" onclick="switchPortfolioTab('rsu')">🏢 RSU</button>
+                <button class="tab-btn" onclick="switchPortfolioTab('etf')">📊 ETF</button>
+                <button class="tab-btn" onclick="switchPortfolioTab('mf')">🏦 MF</button>
+            </div>
+
+            <!-- Search & Filter -->
+            <div class="search-filter-bar">
+                <input type="text" id="portfolio-search" placeholder="Search stocks..." oninput="filterPortfolio()">
+                <select id="portfolio-sort" onchange="sortPortfolio()">
+                    <option value="value">Sort: Value</option>
+                    <option value="pnl">Sort: P&L</option>
+                    <option value="returns">Sort: Returns</option>
+                    <option value="name">Sort: Name</option>
+                </select>
+            </div>
+
+            <!-- Holdings Table -->
+            <div id="portfolio-holdings" class="holdings-container">
+                <div class="empty-state">No holdings found. Upload your portfolio or add manually.</div>
+            </div>
+
+            <!-- Upload Button -->
+            <div class="upload-cta glass-card">
+                <p>Import your portfolio from broker reports</p>
+                <button class="btn-primary" onclick="navigateTo('upload')">📤 Upload Reports</button>
+            </div>
+        </div>
+
+        <!-- ===== UPLOAD PAGE ===== -->
+        <div id="page-upload" class="page hidden">
+            <div class="page-header">
+                <h2>Import Portfolio</h2>
+            </div>
+
+            <div class="upload-grid">
+                <!-- Indian Holdings -->
+                <div class="upload-card glass-card">
+                    <div class="upload-icon">🇮🇳</div>
+                    <h3>Indian Holdings</h3>
+                    <p>Upload IndMoney/Zerodha holdings PDF or Excel</p>
+                    <label class="upload-label">
+                        <input type="file" id="indian-holdings-file" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload('indian-holdings', this)">
+                        <span class="upload-btn">Choose File</span>
+                    </label>
+                    <div id="indian-holdings-status" class="upload-status"></div>
+                </div>
+
+                <!-- Indian Transactions -->
+                <div class="upload-card glass-card">
+                    <div class="upload-icon">📋</div>
+                    <h3>Indian Transactions</h3>
+                    <p>Upload transaction history Excel/CSV</p>
+                    <label class="upload-label">
+                        <input type="file" id="indian-trans-file" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload('indian-transactions', this)">
+                        <span class="upload-btn">Choose File</span>
+                    </label>
+                    <div id="indian-trans-status" class="upload-status"></div>
+                </div>
+
+                <!-- US Holdings -->
+                <div class="upload-card glass-card">
+                    <div class="upload-icon">🇺🇸</div>
+                    <h3>US Holdings</h3>
+                    <p>Upload Alpaca/Robinhood holdings Excel</p>
+                    <label class="upload-label">
+                        <input type="file" id="us-holdings-file" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload('us-holdings', this)">
+                        <span class="upload-btn">Choose File</span>
+                    </label>
+                    <div id="us-holdings-status" class="upload-status"></div>
+                </div>
+
+                <!-- US Transactions -->
+                <div class="upload-card glass-card">
+                    <div class="upload-icon">💹</div>
+                    <h3>US Transactions</h3>
+                    <p>Upload US transaction history Excel</p>
+                    <label class="upload-label">
+                        <input type="file" id="us-trans-file" accept=".pdf,.xlsx,.xls,.csv" onchange="handleFileUpload('us-transactions', this)">
+                        <span class="upload-btn">Choose File</span>
+                    </label>
+                    <div id="us-trans-status" class="upload-status"></div>
+                </div>
+            </div>
+
+            <!-- Upload Progress -->
+            <div id="upload-progress" class="glass-card hidden">
+                <h3>Processing...</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="upload-progress-fill"></div>
+                </div>
+                <p id="upload-progress-text">Parsing file...</p>
+            </div>
+
+            <!-- Upload Results -->
+            <div id="upload-results" class="glass-card hidden">
+                <h3>Import Results</h3>
+                <div id="upload-results-content"></div>
+                <button class="btn-primary" onclick="navigateTo('portfolio')">View Portfolio →</button>
+            </div>
+        </div>
+
+        <!-- ===== ASSETS PAGE ===== -->
+        <div id="page-assets" class="page hidden">
+            <div class="page-header">
+                <h2>Assets</h2>
+                <button class="btn-icon-primary" onclick="showAddAssetModal()">+ Add</button>
+            </div>
+
+            <!-- Assets Summary -->
+            <div class="portfolio-summary glass-card">
+                <div class="summary-item">
+                    <span class="summary-label">Total Assets</span>
+                    <span class="summary-value" id="total-assets-value">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Invested</span>
+                    <span class="summary-value" id="assets-invested">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Interest Earned</span>
+                    <span class="summary-value positive" id="assets-interest">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Annual Return</span>
+                    <span class="summary-value" id="assets-annual-return">0%</span>
+                </div>
+            </div>
+
+            <!-- Asset Type Tabs -->
+            <div class="tab-bar scrollable">
+                <button class="tab-btn active" onclick="switchAssetTab('all')">All</button>
+                <button class="tab-btn" onclick="switchAssetTab('fd')">FD</button>
+                <button class="tab-btn" onclick="switchAssetTab('gold')">Gold</button>
+                <button class="tab-btn" onclick="switchAssetTab('ppf')">PPF</button>
+                <button class="tab-btn" onclick="switchAssetTab('epf')">EPF</button>
+                <button class="tab-btn" onclick="switchAssetTab('nps')">NPS</button>
+                <button class="tab-btn" onclick="switchAssetTab('realestate')">Real Estate</button>
+                <button class="tab-btn" onclick="switchAssetTab('crypto')">Crypto</button>
+                <button class="tab-btn" onclick="switchAssetTab('other')">Other</button>
+            </div>
+
+            <!-- Assets List -->
+            <div id="assets-list" class="assets-container">
+                <div class="empty-state">No assets added yet. Click + Add to add your first asset.</div>
+            </div>
+        </div>
+
+        <!-- ===== GOALS PAGE ===== -->
+        <div id="page-goals" class="page hidden">
+            <div class="page-header">
+                <h2>Goals</h2>
+                <button class="btn-icon-primary" onclick="showAddGoalModal()">+ Add</button>
+            </div>
+
+            <!-- Goals Summary -->
+            <div class="goals-summary glass-card">
+                <div class="summary-item">
+                    <span class="summary-label">Active Goals</span>
+                    <span class="summary-value" id="active-goals-count">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Target</span>
+                    <span class="summary-value" id="goals-total-target">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Achieved</span>
+                    <span class="summary-value positive" id="goals-achieved">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Avg Progress</span>
+                    <span class="summary-value" id="goals-avg-progress">0%</span>
+                </div>
+            </div>
+
+            <!-- Goals List -->
+            <div id="goals-list" class="goals-container">
+                <div class="empty-state">No goals set yet. Click + Add to create your first goal.</div>
+            </div>
+        </div>
+
+        <!-- ===== MONEY MANAGER PAGE ===== -->
+        <div id="page-money" class="page hidden">
+            <div class="page-header">
+                <h2>Money Manager</h2>
+                <button class="btn-icon-primary" onclick="showAddTransactionModal()">+ Add</button>
+            </div>
+
+            <!-- Money Summary -->
+            <div class="money-summary glass-card">
+                <div class="money-summary-row">
+                    <div class="money-item income">
+                        <span class="money-icon">💚</span>
+                        <div>
+                            <div class="money-label">Income</div>
+                            <div class="money-value" id="total-income">₹0</div>
+                        </div>
+                    </div>
+                    <div class="money-item expense">
+                        <span class="money-icon">❤️</span>
+                        <div>
+                            <div class="money-label">Expenses</div>
+                            <div class="money-value" id="total-expenses">₹0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="savings-bar">
+                    <div class="savings-label">
+                        <span>Savings</span>
+                        <span id="savings-amount">₹0</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill positive" id="savings-rate-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="savings-rate" id="savings-rate">Savings Rate: 0%</div>
+                </div>
+            </div>
+
+            <!-- Period Selector -->
+            <div class="period-selector">
+                <button class="period-btn active" onclick="switchMoneyPeriod('month')">This Month</button>
+                <button class="period-btn" onclick="switchMoneyPeriod('year')">This Year</button>
+                <button class="period-btn" onclick="switchMoneyPeriod('all')">All Time</button>
+            </div>
+
+            <!-- Money Tabs -->
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchMoneyTab('all')">All</button>
+                <button class="tab-btn" onclick="switchMoneyTab('income')">Income</button>
+                <button class="tab-btn" onclick="switchMoneyTab('expense')">Expenses</button>
+            </div>
+
+            <!-- Category Chart -->
+            <div class="glass-card">
+                <h3>Category Breakdown</h3>
+                <div class="chart-container">
+                    <canvas id="expense-category-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Transactions List -->
+            <div id="money-transactions" class="transactions-container">
+                <div class="empty-state">No transactions yet. Click + Add to record income or expenses.</div>
+            </div>
+        </div>
+
+        <!-- ===== TRADES PAGE ===== -->
+        <div id="page-trades" class="page hidden">
+            <div class="page-header">
+                <h2>Trade History</h2>
+                <button class="btn-icon-primary" onclick="showAddTradeModal()">+ Add</button>
+            </div>
+
+            <!-- Trade Filters -->
+            <div class="filter-bar">
+                <select id="trade-period" onchange="filterTrades()">
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                </select>
+                <select id="trade-type" onchange="filterTrades()">
+                    <option value="all">All Types</option>
+                    <option value="BUY">Buy</option>
+                    <option value="SELL">Sell</option>
+                    <option value="DIVIDEND">Dividend</option>
+                </select>
+                <select id="trade-market" onchange="filterTrades()">
+                    <option value="all">All Markets</option>
+                    <option value="indian">Indian</option>
+                    <option value="us">US</option>
+                </select>
+            </div>
+
+            <!-- Trade Summary -->
+            <div class="portfolio-summary glass-card">
+                <div class="summary-item">
+                    <span class="summary-label">Total Trades</span>
+                    <span class="summary-value" id="total-trades">0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Buy Amount</span>
+                    <span class="summary-value" id="total-buy-amount">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Sell Amount</span>
+                    <span class="summary-value" id="total-sell-amount">₹0</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Realized P&L</span>
+                    <span class="summary-value" id="trades-realized-pnl">₹0</span>
+                </div>
+            </div>
+
+            <!-- Trades List -->
+            <div id="trades-list" class="trades-container">
+                <div class="empty-state">No trades recorded. Upload transaction reports or add manually.</div>
+            </div>
+        </div>
+
+        <!-- ===== REBALANCING PAGE ===== -->
+        <div id="page-rebalancing" class="page hidden">
+            <div class="page-header">
+                <h2>Rebalancing</h2>
+                <button class="btn-icon-primary" onclick="showRebalancingSettings()">⚙️</button>
+            </div>
+
+            <!-- Rebalancing Summary -->
+            <div class="rebalancing-summary glass-card">
+                <div class="rebalancing-score">
+                    <div class="score-circle" id="rebalancing-score-circle">
+                        <span id="rebalancing-score">--</span>
+                        <small>Health Score</small>
+                    </div>
+                </div>
+                <div class="rebalancing-stats">
+                    <div class="rebal-stat">
+                        <span class="rebal-label">Buy Signals</span>
+                        <span class="rebal-value positive" id="buy-signals">0</span>
+                    </div>
+                    <div class="rebal-stat">
+                        <span class="rebal-label">Sell Signals</span>
+                        <span class="rebal-value negative" id="sell-signals">0</span>
+                    </div>
+                    <div class="rebal-stat">
+                        <span class="rebal-label">Hold</span>
+                        <span class="rebal-value" id="hold-signals">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div id="rebalancing-recommendations" class="recommendations-container">
+                <div class="empty-state">No portfolio data. Upload holdings to get rebalancing recommendations.</div>
+            </div>
+        </div>
+
+        <!-- ===== RE-ENTRY PAGE ===== -->
+        <div id="page-reentry" class="page hidden">
+            <div class="page-header">
+                <h2>Re-Entry Tracker</h2>
+                <button class="btn-icon-primary" onclick="showReentrySettings()">⚙️</button>
+            </div>
+
+            <div class="glass-card">
+                <p class="info-text">Track stocks you've sold and get alerts when they fall to re-entry levels.</p>
+                <div class="reentry-settings">
+                    <label>Re-entry threshold: <span id="reentry-threshold-display">10%</span></label>
+                    <input type="range" id="reentry-threshold" min="5" max="30" value="10" oninput="updateReentryThreshold(this.value)">
+                </div>
+            </div>
+
+            <!-- Re-entry List -->
+            <div id="reentry-list" class="reentry-container">
+                <div class="empty-state">No sold stocks tracked. Sell transactions will appear here automatically.</div>
+            </div>
+        </div>
+
+        <!-- ===== GROUPS PAGE ===== -->
+        <div id="page-groups" class="page hidden">
+            <div class="page-header">
+                <h2>Stock Groups</h2>
+                <button class="btn-icon-primary" onclick="showAddGroupModal()">+ Group</button>
+            </div>
+
+            <!-- Groups List -->
+            <div id="groups-list" class="groups-container">
+                <div class="empty-state">No groups created. Create custom groups to organize your portfolio.</div>
+            </div>
+        </div>
+
+        <!-- ===== PROFIT COMPARISON PAGE ===== -->
+        <div id="page-comparison" class="page hidden">
+            <div class="page-header">
+                <h2>Profit Comparison</h2>
+            </div>
+
+            <div class="glass-card">
+                <p class="info-text">Compare actual returns vs what you would have earned by holding.</p>
+                <div class="comparison-form">
+                    <div class="form-group">
+                        <label>Stock Sold</label>
+                        <input type="text" id="comp-sold-stock" placeholder="e.g., RELIANCE">
+                    </div>
+                    <div class="form-group">
+                        <label>Sell Date</label>
+                        <input type="date" id="comp-sell-date">
+                    </div>
+                    <div class="form-group">
+                        <label>Invested In</label>
+                        <input type="text" id="comp-new-stock" placeholder="e.g., INFY">
+                    </div>
+                    <button class="btn-primary" onclick="runComparison()">Compare</button>
+                </div>
+            </div>
+
+            <div id="comparison-results" class="hidden">
+                <div class="glass-card comparison-card">
+                    <h3>Comparison Results</h3>
+                    <div id="comparison-content"></div>
+                </div>
+            </div>
+
+            <!-- Sold Stocks History -->
+            <div class="glass-card">
+                <h3>Sold Stocks History</h3>
+                <div id="sold-stocks-list">
+                    <div class="empty-state">No sold stocks found.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SETTINGS PAGE ===== -->
+        <div id="page-settings" class="page hidden">
+            <div class="page-header">
+                <h2>Settings</h2>
+            </div>
+
+            <!-- Profile -->
+            <div class="glass-card settings-section">
+                <h3>Profile</h3>
+                <div class="profile-info">
+                    <div class="profile-avatar">
+                        <div class="logo-circle medium">
+                            <span class="logo-text" id="profile-initials">DS</span>
+                        </div>
+                    </div>
+                    <div class="profile-details">
+                        <div class="profile-name" id="profile-name">User</div>
+                        <div class="profile-email" id="profile-email">user@example.com</div>
+                    </div>
+                </div>
+                <button class="btn-secondary btn-full" onclick="showEditProfileModal()">Edit Profile</button>
+            </div>
+
+            <!-- Preferences -->
+            <div class="glass-card settings-section">
+                <h3>Preferences</h3>
+                <div class="settings-list">
+                    <div class="settings-item">
+                        <span>Dark Mode</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="dark-mode-toggle" checked onchange="toggleTheme()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-item">
+                        <span>Currency</span>
+                        <select id="currency-setting" onchange="updateCurrency(this.value)">
+                            <option value="INR">INR (₹)</option>
+                            <option value="USD">USD ($)</option>
+                        </select>
+                    </div>
+                    <div class="settings-item">
+                        <span>RSU Company</span>
+                        <input type="text" id="rsu-company" placeholder="e.g., QCOM" value="QCOM" onchange="updateRSUCompany(this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rebalancing Settings -->
+            <div class="glass-card settings-section">
+                <h3>Rebalancing Rules</h3>
+                <div class="settings-list">
+                    <div class="settings-item">
+                        <span>Trim if gain exceeds</span>
+                        <div class="input-with-unit">
+                            <input type="number" id="trim-threshold" value="30" min="10" max="100">
+                            <span>%</span>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span>Add if allocation below</span>
+                        <div class="input-with-unit">
+                            <input type="number" id="min-allocation" value="2" min="0.5" max="10">
+                            <span>%</span>
+                        </div>
+                    </div>
+                    <div class="settings-item">
+                        <span>Reduce if allocation above</span>
+                        <div class="input-with-unit">
+                            <input type="number" id="max-allocation" value="15" min="5" max="50">
+                            <span>%</span>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="saveRebalancingSettings()">Save Settings</button>
+            </div>
+
+            <!-- Data Management -->
+            <div class="glass-card settings-section">
+                <h3>Data Management</h3>
+                <div class="settings-buttons">
+                    <button class="btn-secondary" onclick="exportData()">📤 Export Data</button>
+                    <button class="btn-secondary" onclick="importData()">📥 Import Data</button>
+                    <button class="btn-danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+                </div>
+            </div>
+
+            <!-- App Info -->
+            <div class="glass-card settings-section">
+                <h3>About</h3>
+                <div class="about-info">
+                    <p><strong>DS Wealth Tracker</strong></p>
+                    <p>Version 1.0.0</p>
+                    <p>Personal Financial Management PWA</p>
+                    <p>All data stored locally on your device</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-btn active" onclick="navigateTo('dashboard')" data-page="dashboard">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Home</span>
+        </button>
+        <button class="nav-btn" onclick="navigateTo('portfolio')" data-page="portfolio">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Portfolio</span>
+        </button>
+        <button class="nav-btn" onclick="navigateTo('assets')" data-page="assets">
+            <span class="nav-icon">💎</span>
+            <span class="nav-label">Assets</span>
+        </button>
+        <button class="nav-btn" onclick="navigateTo('money')" data-page="money">
+            <span class="nav-icon">💰</span>
+            <span class="nav-label">Money</span>
+        </button>
+        <button class="nav-btn" onclick="showMoreMenu()" data-page="more">
+            <span class="nav-icon">⋯</span>
+            <span class="nav-label">More</span>
+        </button>
+    </nav>
+
+    <!-- More Menu -->
+    <div id="more-menu" class="more-menu hidden">
+        <div class="more-menu-overlay" onclick="hideMoreMenu()"></div>
+        <div class="more-menu-content glass-card">
+            <h3>More Features</h3>
+            <div class="more-menu-grid">
+                <button class="more-menu-item" onclick="navigateTo('goals'); hideMoreMenu()">
+                    <span class="more-icon">🎯</span>
+                    <span>Goals</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('trades'); hideMoreMenu()">
+                    <span class="more-icon">📈</span>
+                    <span>Trades</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('rebalancing'); hideMoreMenu()">
+                    <span class="more-icon">⚖️</span>
+                    <span>Rebalance</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('reentry'); hideMoreMenu()">
+                    <span class="more-icon">🔄</span>
+                    <span>Re-Entry</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('groups'); hideMoreMenu()">
+                    <span class="more-icon">📁</span>
+                    <span>Groups</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('comparison'); hideMoreMenu()">
+                    <span class="more-icon">🔀</span>
+                    <span>Compare</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('upload'); hideMoreMenu()">
+                    <span class="more-icon">📤</span>
+                    <span>Upload</span>
+                </button>
+                <button class="more-menu-item" onclick="navigateTo('settings'); hideMoreMenu()">
+                    <span class="more-icon">⚙️</span>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Add Holding Modal -->
+<div id="modal-add-holding" class="modal hidden">
+    <div class="modal-overlay" onclick="closeModal('modal-add-holding')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h3>Add Holding</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-holding')">✕</button>
+        </div>
+        <form id="add-holding-form" onsubmit="saveHolding(event)">
+            <div class="form-group">
+                <label>Market</label>
+                <select id="holding-market" onchange="updateHoldingMarket()">
+                    <option value="indian">Indian</option>
+                    <option value="us">US</option>
+                    <option value="rsu">RSU</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Stock Symbol</label>
+                <input type="text" id="holding-symbol" placeholder="e.g., RELIANCE" required>
+            </div>
+            <div class="form-group">
+                <label>Stock Name</label>
+                <input type="text" id="holding-name" placeholder="e.g., Reliance Industries">
+            </div>
+            <div class="form-group">
+                <label>Quantity</label>
+                <input type="number" id="holding-qty" placeholder="0" step="0.000001" required>
+            </div>
+            <div class="form-group">
+                <label>Average Price</label>
+                <input type="number" id="holding-avg-price" placeholder="0.00" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label>Sector</label>
+                <select id="holding-sector">
+                    <option value="">Select Sector</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Banking">Banking & Finance</option>
+                    <option value="Healthcare">Healthcare & Pharma</option>
+                    <option value="Energy">Energy</option>
+                    <option value="FMCG">FMCG</option>
+                    <option value="Auto">Automobile</option>
+                    <option value="Metals">Metals & Mining</option>
+                    <option value="Realty">Real Estate</option>
+                    <option value="Telecom">Telecom</option>
+                    <option value="Infrastructure">Infrastructure</option>
+                    <option value="ETF">ETF</option>
+                    <option value="MutualFund">Mutual Fund</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select id="holding-type">
+                    <option value="stock">Stock</option>
+                    <option value="etf">ETF</option>
+                    <option value="mf">Mutual Fund</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('modal-add-holding')">Cancel</button>
+                <button type="submit" class="btn-primary">Add Holding</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Asset Modal -->
+<div id="modal-add-asset" class="modal hidden">
+    <div class="modal-overlay" onclick="closeModal('modal-add-asset')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h3>Add Asset</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-asset')">✕</button>
+        </div>
+        <form id="add-asset-form" onsubmit="saveAsset(event)">
+            <div class="form-group">
+                <label>Asset Type</label>
+                <select id="asset-type" onchange="updateAssetForm()">
+                    <option value="fd">Fixed Deposit (FD)</option>
+                    <option value="bonds">Bonds</option>
+                    <option value="gold">Gold</option>
+                    <option value="silver">Silver</option>
+                    <option value="lic">LIC</option>
+                    <option value="ppf">PPF</option>
+                    <option value="epf">EPF</option>
+                    <option value="nps">NPS</option>
+                    <option value="realestate">Real Estate</option>
+                    <option value="crypto">Crypto</option>
+                    <option value="cash">Cash</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Name / Description</label>
+                <input type="text" id="asset-name" placeholder="e.g., SBI FD - 2 Year" required>
+            </div>
+            <div class="form-group">
+                <label>Investment Amount (₹)</label>
+                <input type="number" id="asset-amount" placeholder="0" required>
+            </div>
+            <div class="form-group" id="asset-rate-group">
+                <label>Interest Rate (%)</label>
+                <input type="number" id="asset-rate" placeholder="7.5" step="0.01">
+            </div>
+            <div class="form-group" id="asset-compound-group">
+                <label>Compounding</label>
+                <select id="asset-compound">
+                    <option value="annual">Annual</option>
+                    <option value="semi-annual">Semi-Annual</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Start Date</label>
+                <input type="date" id="asset-start-date">
+            </div>
+            <div class="form-group" id="asset-maturity-group">
+                <label>Maturity Date</label>
+                <input type="date" id="asset-maturity-date">
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea id="asset-notes" placeholder="Optional notes..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('modal-add-asset')">Cancel</button>
+                <button type="submit" class="btn-primary">Add Asset</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Goal Modal -->
+<div id="modal-add-goal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeModal('modal-add-goal')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h3>Add Goal</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-goal')">✕</button>
+        </div>
+        <form id="add-goal-form" onsubmit="saveGoal(event)">
+            <div class="form-group">
+                <label>Goal Name</label>
+                <input type="text" id="goal-name" placeholder="e.g., House Purchase" required>
+            </div>
+            <div class="form-group">
+                <label>Goal Type</label>
+                <select id="goal-type">
+                    <option value="house">House Purchase</option>
+                    <option value="education">Child Education</option>
+                    <option value="car">Car Purchase</option>
+                    <option value="retirement">Retirement</option>
+                    <option value="vacation">Vacation</option>
+                    <option value="emergency">Emergency Fund</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Target Amount (₹)</label>
+                <input type="number" id="goal-target" placeholder="0" required>
+            </div>
+            <div class="form-group">
+                <label>Target Year</label>
+                <input type="number" id="goal-year" placeholder="2030" min="2024" max="2060" required>
+            </div>
+            <div class="form-group">
+                <label>Expected Annual Return (%)</label>
+                <input type="number" id="goal-return" placeholder="12" step="0.1" value="12">
+            </div>
+            <div class="form-group">
+                <label>Current Savings (₹)</label>
+                <input type="number" id="goal-current" placeholder="0" value="0">
+            </div>
+            <div class="form-group">
+                <label>Inflation Rate (%)</label>
+                <input type="number" id="goal-inflation" placeholder="6" step="0.1" value="6">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('modal-add-goal')">Cancel</button>
+                <button type="submit" class="btn-primary">Add Goal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Transaction Modal (Money Manager) -->
+<div id="modal-add-transaction" class="modal hidden">
+    <div class="modal-overlay" onclick="closeModal('modal-add-transaction')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h3>Add Transaction</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-transaction')">✕</button>
+        </div>
+        <form id="add-transaction-form" onsubmit="saveTransaction(event)">
+            <div class="tab-bar">
+                <button type="button" class="tab-btn active" onclick="setTransactionType('income')">Income</button>
+                <button type="button" class="tab-btn" onclick="setTransactionType('expense')">Expense</button>
+            </div>
+            <input type="hidden" id="transaction-type" value="income">
+            <div class="form-group">
+                <label>Amount (₹)</label>
+                <input type="number" id="transaction-amount" placeholder="0" required>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="transaction-category">
+                    <optgroup label="Income" id="income-categories">
+                        <option value="salary">Salary</option>
+                        <option value="bonus">Bonus</option>
+                        <option value="dividends">Dividends</option>
+                        <option value="business">Business Income</option>
+                        <option value="other-income">Other Income</option>
+                    </optgroup>
+                    <optgroup label="Expenses" id="expense-categories">
+                        <option value="rent">Rent</option>
+                        <option value="food">Food & Dining</option>
+                        <option value="travel">Travel</option>
+                        <option value="shopping">Shopping</option>
+                        <option value="utilities">Utilities</option>
+                        <option value="emi">EMI</option>
+                        <option value="insurance">Insurance</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="entertainment">Entertainment</option>
+                        <option value="other-expense">Other Expense</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="transaction-date" required>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="transaction-desc" placeholder="Optional description">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('modal-add-transaction')">Cancel</button>
+                <button type="submit" class="btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Group Modal -->
+<div id="modal-add-group" class="modal hidden">
+    <div class="modal-overlay" onclick="closeModal('modal-add-group')"></div>
+    <div class="modal-content glass-card">
+        <div class="modal-header">
+            <h3>Create Group</h3>
+            <button class="modal-close" onclick="closeModal('modal-add-group')">✕</button>
+        </div>
+        <form id="add-group-form" onsubmit="saveGroup(event)">
+            <div class="form-group">
+                <label>Group Name</label>
+                <input type="text" id="group-name" placeholder="e.g., AI Stocks" required>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <input type="text" id="group-desc" placeholder="Optional description">
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <input type="color" id="group-color" value="#6C63FF">
+            </div>
+            <div class="form-group">
+                <label>Select Stocks</label>
+                <div id="group-stocks-selector" class="stocks-selector">
+                    <div class="empty-state small">No holdings available</div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal('modal-add-group')">Cancel</button>
+                <button type="submit" class="btn-primary">Create Group</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast hidden">
+    <span id="toast-message"></span>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <p id="loading-text">Loading...</p>
+</div>
+
+<!-- Scripts -->
+<script src="js/db.js?v=3"></script>
+<script src="js/auth.js?v=3"></script>
+<script src="js/market.js?v=3"></script>
+<script src="js/portfolio.js?v=3"></script>
+<script src="js/upload.js?v=3"></script>
+<script src="js/assets.js?v=3"></script>
+<script src="js/goals.js?v=3"></script>
+<script src="js/money.js?v=3"></script>
+<script src="js/trades.js?v=3"></script>
+<script src="js/rebalancing.js?v=3"></script>
+<script src="js/reentry.js?v=3"></script>
+<script src="js/groups.js?v=3"></script>
+<script src="js/charts.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
+
+</body>
+</html>
