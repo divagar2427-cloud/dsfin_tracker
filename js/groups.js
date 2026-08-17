@@ -1,4 +1,59 @@
-// ===== DS WEALTH TRACKER - Groups Module =====
+// ===== DS WEALTH TRACKER - Enhanced Groups Module =====
+
+// ===== DEFAULT GROUP TEMPLATES =====
+const DEFAULT_GROUPS = [
+  {
+    name: 'Personal Finance',
+    description: 'My personal income, expenses & savings',
+    color: '#3B82F6',
+    icon: '👤',
+    category: 'personal',
+    symbols: []
+  },
+  {
+    name: 'Family Finance',
+    description: 'Family expenses, education & healthcare',
+    color: '#10B981',
+    icon: '👨‍👩‍👧‍👦',
+    category: 'family',
+    symbols: []
+  },
+  {
+    name: 'Investments',
+    description: 'Stocks, ETFs, Mutual Funds & other investments',
+    color: '#F59E0B',
+    icon: '📈',
+    category: 'investment',
+    symbols: []
+  },
+  {
+    name: 'Savings Goals',
+    description: 'Emergency fund, vacation, big purchases',
+    color: '#14B8A6',
+    icon: '🏦',
+    category: 'savings',
+    symbols: []
+  },
+  {
+    name: 'Home Expenses',
+    description: 'Rent, utilities, maintenance & household',
+    color: '#8B5CF6',
+    icon: '🏠',
+    category: 'home',
+    symbols: []
+  }
+];
+
+// ===== INITIALIZE DEFAULT GROUPS =====
+async function initDefaultGroups(userId) {
+  const existing = await GroupsDB.getAll(userId);
+  if (existing.length > 0) return; // Already has groups
+
+  for (const group of DEFAULT_GROUPS) {
+    await GroupsDB.add(userId, group);
+  }
+  console.log('Default groups created');
+}
 
 // ===== RENDER GROUPS PAGE =====
 async function renderGroupsPage() {
@@ -13,13 +68,19 @@ async function renderGroupsPage() {
   if (!container) return;
 
   if (groups.length === 0) {
-    container.innerHTML = '<div class="empty-state">No groups created. Create custom groups to organize your portfolio.</div>';
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>No groups yet.</p>
+        <button class="btn-primary" onclick="createDefaultGroups()" style="margin-top:12px;">
+          ✨ Create Default Groups
+        </button>
+      </div>
+    `;
     return;
   }
 
   container.innerHTML = groups.map(g => {
     const groupHoldings = holdings.filter(h => (g.symbols || []).includes(h.symbol));
-
     let totalInvested = 0, totalCurrent = 0, totalPnl = 0;
     groupHoldings.forEach(h => {
       const m = calculateHoldingMetrics(h, priceMap[h.symbol]);
@@ -27,21 +88,23 @@ async function renderGroupsPage() {
       totalCurrent += m.currentValueINR;
       totalPnl += m.pnlINR;
     });
-
     const returns = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+    const icon = g.icon || '📁';
+    const color = g.color || '#6C63FF';
 
     return `
-      <div class="group-card">
+      <div class="group-card" style="border-left: 4px solid ${color};">
         <div class="group-header">
-          <div class="group-color-dot" style="background: ${g.color || '#6C63FF'}; width:16px; height:16px; border-radius:50%;"></div>
-          <span class="group-name">${g.name}</span>
-          <span class="group-count">${groupHoldings.length} stocks</span>
+          <div style="width:44px; height:44px; border-radius:12px; background:${color}22; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;">${icon}</div>
+          <div style="flex:1; min-width:0;">
+            <div class="group-name">${g.name}</div>
+            ${g.description ? `<div style="font-size:0.75rem; color:var(--text-muted);">${g.description}</div>` : ''}
+          </div>
           <div style="display:flex;gap:6px;">
             <button class="btn-sm btn-edit" onclick="editGroup(${g.id})">Edit</button>
             <button class="btn-sm btn-delete" onclick="deleteGroup(${g.id})">Del</button>
           </div>
         </div>
-        ${g.description ? `<p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">${g.description}</p>` : ''}
         <div class="group-stats">
           <div class="group-stat">
             <span class="group-stat-label">Invested</span>
@@ -57,12 +120,20 @@ async function renderGroupsPage() {
           </div>
         </div>
         <div class="group-stocks">
-          ${groupHoldings.map(h => `<span class="group-stock-tag">${h.symbol}</span>`).join('')}
-          ${groupHoldings.length === 0 ? '<span style="font-size:0.8rem; color:var(--text-muted);">No stocks assigned</span>' : ''}
+          ${groupHoldings.map(h => `<span class="group-stock-tag" style="border-color:${color}44;">${h.symbol}</span>`).join('')}
+          ${groupHoldings.length === 0 ? `<span style="font-size:0.8rem; color:var(--text-muted);">No stocks assigned · <button onclick="editGroup(${g.id})" style="background:none;color:var(--primary);font-size:0.8rem;cursor:pointer;">Add stocks</button></span>` : ''}
         </div>
       </div>
     `;
   }).join('');
+}
+
+// ===== CREATE DEFAULT GROUPS =====
+async function createDefaultGroups() {
+  if (!currentUser) return;
+  await initDefaultGroups(currentUser.id);
+  showToast('Default groups created! ✨');
+  await renderGroupsPage();
 }
 
 // ===== SHOW ADD GROUP MODAL =====
@@ -70,7 +141,6 @@ function showAddGroupModal(groupId = null) {
   const modal = document.getElementById('modal-add-group');
   if (!modal) return;
 
-  // Populate stocks selector
   HoldingsDB.getAll(currentUser.id).then(holdings => {
     const selector = document.getElementById('group-stocks-selector');
     if (selector) {
@@ -93,9 +163,8 @@ function showAddGroupModal(groupId = null) {
           document.getElementById('group-name').value = g.name;
           document.getElementById('group-desc').value = g.description || '';
           document.getElementById('group-color').value = g.color || '#6C63FF';
-          // Check selected stocks
           (g.symbols || []).forEach(sym => {
-            const cb = document.getElementById(`gs-${sym}`);
+            const cb = document.getElementById('gs-' + sym);
             if (cb) cb.checked = true;
           });
           modal.dataset.editId = groupId;
@@ -117,7 +186,6 @@ async function saveGroup(event) {
   const modal = document.getElementById('modal-add-group');
   const editId = modal?.dataset.editId ? parseInt(modal.dataset.editId) : null;
 
-  // Get selected symbols
   const checkboxes = document.querySelectorAll('input[name="group-stock"]:checked');
   const symbols = Array.from(checkboxes).map(cb => cb.value);
 
@@ -125,6 +193,7 @@ async function saveGroup(event) {
     name: document.getElementById('group-name').value.trim(),
     description: document.getElementById('group-desc').value.trim(),
     color: document.getElementById('group-color').value,
+    icon: '📁',
     symbols
   };
 
@@ -149,9 +218,7 @@ async function saveGroup(event) {
 }
 
 // ===== EDIT GROUP =====
-function editGroup(id) {
-  showAddGroupModal(id);
-}
+function editGroup(id) { showAddGroupModal(id); }
 
 // ===== DELETE GROUP =====
 async function deleteGroup(id) {

@@ -94,6 +94,9 @@ async function initializeApp() {
   try {
     console.log('Initializing app features...');
     
+    // Run onboarding for new users
+    await runOnboarding();
+    
     // Fetch USD/INR rate (non-blocking)
     fetchUSDINRRate().catch(e => console.log('USD/INR fetch failed:', e));
 
@@ -109,6 +112,30 @@ async function initializeApp() {
 
   } catch (err) {
     console.error('Initialize app error:', err);
+  }
+}
+
+// ===== ONBOARDING - Create default data for new users =====
+async function runOnboarding() {
+  if (!currentUser) return;
+  const userId = currentUser.id;
+  
+  try {
+    // Check if onboarding already done
+    const onboardingDone = await SettingsDB.get('onboarding_done_' + userId);
+    if (onboardingDone) return;
+    
+    console.log('Running onboarding for new user...');
+    
+    // Create default groups
+    await initDefaultGroups(userId);
+    
+    // Mark onboarding as done
+    await SettingsDB.set('onboarding_done_' + userId, true);
+    
+    console.log('Onboarding complete!');
+  } catch (e) {
+    console.error('Onboarding error:', e);
   }
 }
 
