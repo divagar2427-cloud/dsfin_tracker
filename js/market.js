@@ -1,9 +1,17 @@
-// ===== DS WEALTH TRACKER - Enhanced Market Data Module =====
+// ===== DS WEALTH TRACKER - Enhanced Market Data Module v2 =====
+// Fixes CORS issues with Yahoo Finance using proxy fallback
 
 let usdInrRate = 84.5;
 let marketDataCache = {};
 let lastRefreshTime = null;
 let isRefreshing = false;
+
+// ===== CORS PROXY SUPPORT =====
+const CORS_PROXIES = [
+  'https://corsproxy.io/?url=',
+  'https://api.allorigins.win/raw?url=',
+  'https://cors-anywhere.herokuapp.com/'
+];
 
 // ===== SECTOR MAPPING =====
 const SECTOR_MAP = {
@@ -33,7 +41,8 @@ const SECTOR_MAP = {
   'VOO': 'ETF', 'SMH': 'ETF', 'XLK': 'ETF', 'SOXX': 'ETF', 'QQQM': 'ETF',
   'EWY': 'ETF', 'EWJ': 'ETF', 'EWT': 'ETF', 'DRAM': 'ETF', 'SKYY': 'ETF',
   'NFLX': 'Entertainment', 'DAL': 'Airlines', 'M': 'Retail',
-  'SPCX': 'Aerospace', 'ARM': 'Technology', 'TM': 'Auto'
+  'SPCX': 'Aerospace', 'ARM': 'Technology', 'TM': 'Auto',
+  'BTC': 'Crypto', 'ETH': 'Crypto', 'SOL': 'Crypto', 'BNB': 'Crypto'
 };
 
 // ===== FETCH WITH TIMEOUT =====
@@ -48,6 +57,35 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
     clearTimeout(timeout);
     throw err;
   }
+}
+
+// ===== FETCH WITH CORS PROXY FALLBACK =====
+async function fetchWithCORSProxy(url, options = {}) {
+  // Try direct first
+  try {
+    const response = await fetchWithTimeout(url, options, 6000);
+    if (response.ok) {
+      console.log('✓ Direct fetch succeeded:', url.substring(0, 60));
+      return response;
+    }
+  } catch (e) {
+    console.log('✗ Direct fetch failed, trying CORS proxy...');
+  }
+
+  // Try CORS proxies
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const proxyUrl = proxy + encodeURIComponent(url);
+      const response = await fetchWithTimeout(proxyUrl, {}, 10000);
+      if (response.ok) {
+        console.log('✓ CORS proxy succeeded:', proxy.substring(0, 30));
+        return response;
+      }
+    } catch (e) { /* try next proxy */ }
+  }
+
+  console.log('✗ All fetch attempts failed for:', url.substring(0, 60));
+  return null;
 }
 
 // ===== FETCH USD/INR RATE =====
@@ -68,7 +106,7 @@ async function fetchUSDINRRate() {
           usdInrRate = rate;
           await MarketPricesDB.set('USD_INR', { price: rate, currency: 'INR', updatedAt: new Date().toISOString() });
           updateExchangeRateDisplay();
-          console.log('USD/INR rate fetched:', rate);
+          console.log('✓ USD/INR rate:', rate);
           return rate;
         }
       }
@@ -89,42 +127,50 @@ async function fetchUSDINRRate() {
   return usdInrRate;
 }
 
-// ===== FETCH STOCK PRICE VIA YAHOO FINANCE =====
+// ===== PARSE YAHOO FINANCE RESPONSE =====
+function parseYahooResponse(data, symbol) {
+  try {
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+    const meta = result.meta;
+    const price = meta.regularMarketPrice || meta.previousClose;
+    const prevClose = meta.previousClose || meta.chartPreviousClose || price;
+    if (!price || price <= 0) return null;
+    const change = price - prevClose;
+    const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+    return {
+      price,
+      prevClose,
+      change,
+      changePct,
+      currency: meta.currency || 'USD',
+      name: meta.longName || meta.shortName || symbol,
+      updatedAt: new Date().toISOString()
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// ===== FETCH YAHOO PRICE =====
 async function fetchYahooPrice(symbol) {
-  const endpoints = [
+  const urls = [
     `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
     `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`
   ];
 
-  for (const url of endpoints) {
+  for (const url of urls) {
     try {
-      const response = await fetchWithTimeout(url, {
-        headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' }
-      }, 8000);
-
-      if (response.ok) {
+      const response = await fetchWithCORSProxy(url);
+      if (response) {
         const data = await response.json();
-        const result = data?.chart?.result?.[0];
+        const result = parseYahooResponse(data, symbol);
         if (result) {
-          const meta = result.meta;
-          const price = meta.regularMarketPrice || meta.previousClose;
-          const prevClose = meta.previousClose || meta.chartPreviousClose || price;
-          if (price && price > 0) {
-            const change = price - prevClose;
-            const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
-            return {
-              price,
-              prevClose,
-              change,
-              changePct,
-              currency: meta.currency || 'USD',
-              name: meta.longName || meta.shortName || symbol,
-              updatedAt: new Date().toISOString()
-            };
-          }
+          console.log(`✓ Price fetched for ${symbol}: ${result.price} (${result.changePct.toFixed(2)}%)`);
+          return result;
         }
       }
-    } catch (e) { /* try next endpoint */ }
+    } catch (e) { /* try next */ }
   }
   return null;
 }
@@ -132,10 +178,10 @@ async function fetchYahooPrice(symbol) {
 // ===== FETCH INDIAN STOCK PRICE =====
 async function fetchIndianStockPrice(symbol) {
   const cleanSymbol = symbol.replace('.NS', '').replace('.BO', '');
+  console.log(`Fetching Indian price for: ${cleanSymbol}`);
 
   // Try NSE first, then BSE
-  const suffixes = ['.NS', '.BO'];
-  for (const suffix of suffixes) {
+  for (const suffix of ['.NS', '.BO']) {
     const result = await fetchYahooPrice(cleanSymbol + suffix);
     if (result) {
       result.currency = 'INR';
@@ -147,36 +193,98 @@ async function fetchIndianStockPrice(symbol) {
   const result = await fetchYahooPrice(cleanSymbol);
   if (result) return result;
 
+  console.log(`✗ Could not fetch price for ${cleanSymbol}`);
   return null;
 }
 
 // ===== FETCH US STOCK PRICE =====
 async function fetchUSStockPrice(symbol) {
+  console.log(`Fetching US price for: ${symbol}`);
   return await fetchYahooPrice(symbol);
+}
+
+// ===== FETCH CRYPTO PRICE (CoinGecko - supports CORS) =====
+async function fetchCryptoPrice(symbol) {
+  const coinMap = {
+    'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana',
+    'BNB': 'binancecoin', 'ADA': 'cardano', 'XRP': 'ripple',
+    'DOGE': 'dogecoin', 'MATIC': 'matic-network', 'DOT': 'polkadot'
+  };
+
+  const coinId = coinMap[symbol.toUpperCase()];
+  if (!coinId) return await fetchYahooPrice(symbol + '-USD');
+
+  try {
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`;
+    const response = await fetchWithTimeout(url, {}, 8000);
+    if (response.ok) {
+      const data = await response.json();
+      const coinData = data[coinId];
+      if (coinData) {
+        const price = coinData.usd;
+        const changePct = coinData.usd_24h_change || 0;
+        const prevClose = price / (1 + changePct / 100);
+        return {
+          price,
+          prevClose,
+          change: price - prevClose,
+          changePct,
+          currency: 'USD',
+          name: symbol,
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+  } catch (e) {}
+
+  return await fetchYahooPrice(symbol + '-USD');
 }
 
 // ===== FETCH GOLD/SILVER PRICE =====
 async function fetchCommodityPrice(type) {
-  const symbolMap = { gold: 'GC=F', silver: 'SI=F', crude: 'CL=F' };
+  const symbolMap = { gold: 'GC=F', silver: 'SI=F', crude: 'CL=F', platinum: 'PL=F' };
   const symbol = symbolMap[type.toLowerCase()];
   if (!symbol) return null;
-  return await fetchYahooPrice(symbol);
+  const result = await fetchYahooPrice(symbol);
+  if (result) result.currency = 'USD';
+  return result;
 }
 
-// ===== FETCH CRYPTO PRICE =====
-async function fetchCryptoPrice(symbol) {
-  const cryptoSymbol = symbol.toUpperCase() + '-USD';
-  return await fetchYahooPrice(cryptoSymbol);
+// ===== FETCH MUTUAL FUND NAV (India) =====
+async function fetchMutualFundNAV(schemeCode) {
+  try {
+    const url = `https://api.mfapi.in/mf/${schemeCode}/latest`;
+    const response = await fetchWithTimeout(url, {}, 8000);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.data && data.data.length > 0) {
+        const nav = parseFloat(data.data[0].nav);
+        const prevNav = data.data.length > 1 ? parseFloat(data.data[1].nav) : nav;
+        return {
+          price: nav,
+          prevClose: prevNav,
+          change: nav - prevNav,
+          changePct: prevNav > 0 ? ((nav - prevNav) / prevNav) * 100 : 0,
+          currency: 'INR',
+          name: data.meta?.scheme_name || 'Mutual Fund',
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+  } catch (e) {}
+  return null;
 }
 
 // ===== BATCH FETCH PRICES =====
 async function fetchPricesForHoldings(holdings) {
   const results = {};
   const errors = [];
+  let successCount = 0;
 
-  // Group by market
   const indianHoldings = holdings.filter(h => h.market === 'indian');
   const usHoldings = holdings.filter(h => h.market === 'us' || h.market === 'rsu');
+
+  console.log(`Fetching prices for ${indianHoldings.length} Indian + ${usHoldings.length} US holdings`);
 
   // Fetch Indian prices
   for (const h of indianHoldings) {
@@ -185,10 +293,11 @@ async function fetchPricesForHoldings(holdings) {
       if (price) {
         results[h.symbol] = price;
         await MarketPricesDB.set(h.symbol, price);
+        successCount++;
       } else {
         errors.push(h.symbol);
       }
-      await sleep(150); // Rate limiting
+      await sleep(200); // Rate limiting
     } catch (e) {
       errors.push(h.symbol);
     }
@@ -201,18 +310,18 @@ async function fetchPricesForHoldings(holdings) {
       if (price) {
         results[h.symbol] = price;
         await MarketPricesDB.set(h.symbol, price);
+        successCount++;
       } else {
         errors.push(h.symbol);
       }
-      await sleep(150);
+      await sleep(200);
     } catch (e) {
       errors.push(h.symbol);
     }
   }
 
-  if (errors.length > 0) {
-    console.log('Failed to fetch prices for:', errors.join(', '));
-  }
+  console.log(`Price fetch complete: ${successCount} success, ${errors.length} failed`);
+  if (errors.length > 0) console.log('Failed symbols:', errors.join(', '));
 
   return results;
 }
@@ -228,6 +337,8 @@ async function getPrice(symbol, market) {
     let price = null;
     if (market === 'indian') {
       price = await fetchIndianStockPrice(symbol);
+    } else if (market === 'crypto') {
+      price = await fetchCryptoPrice(symbol);
     } else {
       price = await fetchUSStockPrice(symbol);
     }
@@ -252,7 +363,7 @@ async function refreshMarketData() {
   if (refreshBtn) refreshBtn.style.animation = 'spin 1s linear infinite';
 
   try {
-    showToast('Fetching live prices...');
+    showToast('🔄 Fetching live prices...');
 
     // Fetch USD/INR rate
     await fetchUSDINRRate();
@@ -260,7 +371,7 @@ async function refreshMarketData() {
     // Get all holdings
     const holdings = await HoldingsDB.getAll(currentUser.id);
     if (holdings.length === 0) {
-      showToast('No holdings to refresh');
+      showToast('No holdings to refresh. Add holdings first.');
       return;
     }
 
@@ -276,7 +387,11 @@ async function refreshMarketData() {
     await renderPortfolioPage();
     await renderDashboard();
 
-    showToast(`Updated ${successCount}/${totalCount} prices ✓`);
+    if (successCount > 0) {
+      showToast(`✅ Updated ${successCount}/${totalCount} prices`);
+    } else {
+      showToast('⚠️ Could not fetch live prices. Check internet connection.', 'error');
+    }
     updateLastRefreshTime();
 
   } catch (e) {
