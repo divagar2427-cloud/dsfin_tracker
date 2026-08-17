@@ -1,59 +1,45 @@
-// ===== DS WEALTH TRACKER - Enhanced Groups Module =====
+// ===== DS WEALTH TRACKER - Enhanced Groups Module (Logo Selection, No Defaults) =====
 
-// ===== DEFAULT GROUP TEMPLATES =====
-const DEFAULT_GROUPS = [
-  {
-    name: 'Personal Finance',
-    description: 'My personal income, expenses & savings',
-    color: '#3B82F6',
-    icon: '👤',
-    category: 'personal',
-    symbols: []
-  },
-  {
-    name: 'Family Finance',
-    description: 'Family expenses, education & healthcare',
-    color: '#10B981',
-    icon: '👨‍👩‍👧‍👦',
-    category: 'family',
-    symbols: []
-  },
-  {
-    name: 'Investments',
-    description: 'Stocks, ETFs, Mutual Funds & other investments',
-    color: '#F59E0B',
-    icon: '📈',
-    category: 'investment',
-    symbols: []
-  },
-  {
-    name: 'Savings Goals',
-    description: 'Emergency fund, vacation, big purchases',
-    color: '#14B8A6',
-    icon: '🏦',
-    category: 'savings',
-    symbols: []
-  },
-  {
-    name: 'Home Expenses',
-    description: 'Rent, utilities, maintenance & household',
-    color: '#8B5CF6',
-    icon: '🏠',
-    category: 'home',
-    symbols: []
-  }
+// ===== AVAILABLE GROUP LOGOS =====
+const GROUP_LOGOS = [
+  // Finance & Investment
+  { emoji: '📈', label: 'Investments' },
+  { emoji: '💰', label: 'Wealth' },
+  { emoji: '🏦', label: 'Banking' },
+  { emoji: '💎', label: 'Premium' },
+  { emoji: '📊', label: 'Portfolio' },
+  { emoji: '💹', label: 'Trading' },
+  { emoji: '🪙', label: 'Savings' },
+  { emoji: '💳', label: 'Finance' },
+  // Family & Personal
+  { emoji: '👨‍👩‍👧‍👦', label: 'Family' },
+  { emoji: '👤', label: 'Personal' },
+  { emoji: '🏠', label: 'Home' },
+  { emoji: '🎓', label: 'Education' },
+  { emoji: '🏥', label: 'Healthcare' },
+  { emoji: '🚗', label: 'Vehicle' },
+  // Goals
+  { emoji: '🎯', label: 'Goals' },
+  { emoji: '🏖️', label: 'Retirement' },
+  { emoji: '🛡️', label: 'Emergency' },
+  { emoji: '✈️', label: 'Travel' },
+  { emoji: '🏗️', label: 'Property' },
+  { emoji: '💍', label: 'Wedding' },
+  // Business
+  { emoji: '💼', label: 'Business' },
+  { emoji: '🏢', label: 'Corporate' },
+  { emoji: '🚀', label: 'Startup' },
+  { emoji: '🤝', label: 'Partnership' },
+  // Stocks & Markets
+  { emoji: '🇮🇳', label: 'India' },
+  { emoji: '🇺🇸', label: 'US' },
+  { emoji: '🌍', label: 'Global' },
+  { emoji: '⚡', label: 'Energy' },
+  { emoji: '💊', label: 'Pharma' },
+  { emoji: '🏭', label: 'Industry' },
+  { emoji: '🌾', label: 'Agriculture' },
+  { emoji: '🔬', label: 'Technology' },
 ];
-
-// ===== INITIALIZE DEFAULT GROUPS =====
-async function initDefaultGroups(userId) {
-  const existing = await GroupsDB.getAll(userId);
-  if (existing.length > 0) return; // Already has groups
-
-  for (const group of DEFAULT_GROUPS) {
-    await GroupsDB.add(userId, group);
-  }
-  console.log('Default groups created');
-}
 
 // ===== RENDER GROUPS PAGE =====
 async function renderGroupsPage() {
@@ -70,9 +56,9 @@ async function renderGroupsPage() {
   if (groups.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <p>No groups yet.</p>
-        <button class="btn-primary" onclick="createDefaultGroups()" style="margin-top:12px;">
-          ✨ Create Default Groups
+        <p style="margin-bottom:16px;">No groups yet. Create your first group to organize your portfolio!</p>
+        <button class="btn-primary" onclick="showAddGroupModal()" style="margin:0 auto; display:block;">
+          + Create Group
         </button>
       </div>
     `;
@@ -89,13 +75,17 @@ async function renderGroupsPage() {
       totalPnl += m.pnlINR;
     });
     const returns = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
-    const icon = g.icon || '📁';
+    const logo = g.logo || g.icon || '📁';
     const color = g.color || '#6C63FF';
 
     return `
       <div class="group-card" style="border-left: 4px solid ${color};">
         <div class="group-header">
-          <div style="width:44px; height:44px; border-radius:12px; background:${color}22; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0;">${icon}</div>
+          <div style="
+            width:48px; height:48px; border-radius:14px;
+            background:${color}22; display:flex; align-items:center;
+            justify-content:center; font-size:1.6rem; flex-shrink:0;
+          ">${logo}</div>
           <div style="flex:1; min-width:0;">
             <div class="group-name">${g.name}</div>
             ${g.description ? `<div style="font-size:0.75rem; color:var(--text-muted);">${g.description}</div>` : ''}
@@ -128,19 +118,41 @@ async function renderGroupsPage() {
   }).join('');
 }
 
-// ===== CREATE DEFAULT GROUPS =====
-async function createDefaultGroups() {
-  if (!currentUser) return;
-  await initDefaultGroups(currentUser.id);
-  showToast('Default groups created! ✨');
-  await renderGroupsPage();
-}
-
 // ===== SHOW ADD GROUP MODAL =====
 function showAddGroupModal(groupId = null) {
   const modal = document.getElementById('modal-add-group');
   if (!modal) return;
 
+  // Build logo selector
+  const logoSelectorHtml = `
+    <div style="display:flex; flex-wrap:wrap; gap:8px; max-height:160px; overflow-y:auto; padding:8px; background:var(--bg-input); border-radius:12px; border:1px solid var(--border-color);">
+      ${GROUP_LOGOS.map(l => `
+        <button type="button" onclick="selectGroupLogo('${l.emoji}')" id="logo-btn-${l.emoji.codePointAt(0)}" style="
+          width:44px; height:44px; border-radius:10px; font-size:1.3rem;
+          background:var(--glass-bg); border:2px solid transparent;
+          cursor:pointer; display:flex; align-items:center; justify-content:center;
+          transition:all 0.2s;
+        " title="${l.label}">${l.emoji}</button>
+      `).join('')}
+    </div>
+    <input type="hidden" id="group-logo" value="📁">
+    <div id="selected-logo-display" style="margin-top:8px; font-size:0.85rem; color:var(--text-muted);">
+      Selected: <span id="selected-logo-preview">📁</span>
+    </div>
+  `;
+
+  // Replace color input with logo selector in modal
+  const colorGroup = modal.querySelector('.form-group:has(#group-color)') ||
+                     Array.from(modal.querySelectorAll('.form-group')).find(g => g.querySelector('#group-color'));
+
+  if (colorGroup) {
+    colorGroup.innerHTML = `
+      <label>Group Logo</label>
+      ${logoSelectorHtml}
+    `;
+  }
+
+  // Populate stocks selector
   HoldingsDB.getAll(currentUser.id).then(holdings => {
     const selector = document.getElementById('group-stocks-selector');
     if (selector) {
@@ -150,7 +162,7 @@ function showAddGroupModal(groupId = null) {
         selector.innerHTML = holdings.map(h => `
           <label class="stock-selector-item">
             <input type="checkbox" name="group-stock" value="${h.symbol}" id="gs-${h.symbol}">
-            <span>${h.symbol} - ${h.name || h.symbol}</span>
+            <span>${h.symbol} - ${h.name || h.symbol} (${h.market === 'indian' ? '🇮🇳' : h.market === 'rsu' ? '🏢' : '🇺🇸'})</span>
           </label>
         `).join('');
       }
@@ -162,7 +174,13 @@ function showAddGroupModal(groupId = null) {
         if (g) {
           document.getElementById('group-name').value = g.name;
           document.getElementById('group-desc').value = g.description || '';
-          document.getElementById('group-color').value = g.color || '#6C63FF';
+          const logo = g.logo || g.icon || '📁';
+          const logoInput = document.getElementById('group-logo');
+          if (logoInput) logoInput.value = logo;
+          const preview = document.getElementById('selected-logo-preview');
+          if (preview) preview.textContent = logo;
+          // Highlight selected logo
+          selectGroupLogo(logo);
           (g.symbols || []).forEach(sym => {
             const cb = document.getElementById('gs-' + sym);
             if (cb) cb.checked = true;
@@ -172,12 +190,35 @@ function showAddGroupModal(groupId = null) {
       });
     } else {
       document.getElementById('add-group-form').reset();
-      document.getElementById('group-color').value = '#6C63FF';
+      const logoInput = document.getElementById('group-logo');
+      if (logoInput) logoInput.value = '📁';
+      const preview = document.getElementById('selected-logo-preview');
+      if (preview) preview.textContent = '📁';
       delete modal.dataset.editId;
     }
   });
 
   modal.style.display = 'flex';
+}
+
+// ===== SELECT GROUP LOGO =====
+function selectGroupLogo(emoji) {
+  const logoInput = document.getElementById('group-logo');
+  if (logoInput) logoInput.value = emoji;
+  const preview = document.getElementById('selected-logo-preview');
+  if (preview) preview.textContent = emoji;
+
+  // Highlight selected button
+  document.querySelectorAll('[id^="logo-btn-"]').forEach(btn => {
+    btn.style.borderColor = 'transparent';
+    btn.style.background = 'var(--glass-bg)';
+  });
+  const btnId = 'logo-btn-' + emoji.codePointAt(0);
+  const selectedBtn = document.getElementById(btnId);
+  if (selectedBtn) {
+    selectedBtn.style.borderColor = 'var(--primary)';
+    selectedBtn.style.background = 'rgba(108,99,255,0.15)';
+  }
 }
 
 // ===== SAVE GROUP =====
@@ -188,12 +229,14 @@ async function saveGroup(event) {
 
   const checkboxes = document.querySelectorAll('input[name="group-stock"]:checked');
   const symbols = Array.from(checkboxes).map(cb => cb.value);
+  const logo = document.getElementById('group-logo')?.value || '📁';
 
   const group = {
     name: document.getElementById('group-name').value.trim(),
     description: document.getElementById('group-desc').value.trim(),
-    color: document.getElementById('group-color').value,
-    icon: '📁',
+    logo,
+    icon: logo, // backward compat
+    color: '#6C63FF',
     symbols
   };
 

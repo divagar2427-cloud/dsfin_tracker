@@ -1,17 +1,10 @@
-// ===== DS WEALTH TRACKER - Enhanced Market Data Module v2 =====
-// Fixes CORS issues with Yahoo Finance using proxy fallback
+// ===== DS WEALTH TRACKER - Market Data Module v3 =====
+// Uses same approach as DS_WEALTH_OS but adapted for browser with CORS proxy
 
 let usdInrRate = 84.5;
 let marketDataCache = {};
 let lastRefreshTime = null;
 let isRefreshing = false;
-
-// ===== CORS PROXY SUPPORT =====
-const CORS_PROXIES = [
-  'https://corsproxy.io/?url=',
-  'https://api.allorigins.win/raw?url=',
-  'https://cors-anywhere.herokuapp.com/'
-];
 
 // ===== SECTOR MAPPING =====
 const SECTOR_MAP = {
@@ -20,7 +13,7 @@ const SECTOR_MAP = {
   'FEDERALBNK': 'Banking', 'INDUSINDBK': 'Banking', 'IDBI': 'Banking', 'KTKBANK': 'Banking',
   'UJJIVANSFB': 'Banking',
   'INFY': 'Technology', 'TCS': 'Technology', 'WIPRO': 'Technology', 'HCLTECH': 'Technology',
-  'TECHM': 'Technology', 'KPITTECH': 'Technology', 'ITBEES': 'Technology', 'PACEDIGITK': 'Technology',
+  'TECHM': 'Technology', 'KPITTECH': 'Technology', 'ITBEES': 'Technology',
   'RELIANCE': 'Energy', 'NTPC': 'Energy', 'SJVN': 'Energy', 'IREDA': 'Energy',
   'WAAREEENER': 'Energy', 'IEX': 'Energy', 'PETRONET': 'Energy',
   'SUNPHARMA': 'Healthcare', 'DRREDDY': 'Healthcare', 'NATCOPHARM': 'Healthcare',
@@ -40,13 +33,12 @@ const SECTOR_MAP = {
   'NOW': 'Technology', 'DOCN': 'Technology',
   'VOO': 'ETF', 'SMH': 'ETF', 'XLK': 'ETF', 'SOXX': 'ETF', 'QQQM': 'ETF',
   'EWY': 'ETF', 'EWJ': 'ETF', 'EWT': 'ETF', 'DRAM': 'ETF', 'SKYY': 'ETF',
-  'NFLX': 'Entertainment', 'DAL': 'Airlines', 'M': 'Retail',
-  'SPCX': 'Aerospace', 'ARM': 'Technology', 'TM': 'Auto',
-  'BTC': 'Crypto', 'ETH': 'Crypto', 'SOL': 'Crypto', 'BNB': 'Crypto'
+  'NFLX': 'Entertainment', 'DAL': 'Airlines', 'SPCX': 'Aerospace', 'ARM': 'Technology',
+  'BTC': 'Crypto', 'ETH': 'Crypto', 'SOL': 'Crypto'
 };
 
 // ===== FETCH WITH TIMEOUT =====
-async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -59,83 +51,74 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
   }
 }
 
-// ===== FETCH WITH CORS PROXY FALLBACK =====
-async function fetchWithCORSProxy(url, options = {}) {
-  // Try direct first
-  try {
-    const response = await fetchWithTimeout(url, options, 6000);
-    if (response.ok) {
-      console.log('✓ Direct fetch succeeded:', url.substring(0, 60));
-      return response;
-    }
-  } catch (e) {
-    console.log('✗ Direct fetch failed, trying CORS proxy...');
-  }
+// ===== FETCH YAHOO FINANCE (with CORS proxy fallback) =====
+// Mirrors DS_WEALTH_OS approach but for browser
+async function fetchYahooChart(yfSymbol) {
+  const baseUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1d`;
+  const baseUrl2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yfSymbol)}?interval=1d&range=1d`;
 
-  // Try CORS proxies
-  for (const proxy of CORS_PROXIES) {
+  // Try 1: Direct fetch (works in some environments)
+  for (const url of [baseUrl, baseUrl2]) {
     try {
-      const proxyUrl = proxy + encodeURIComponent(url);
-      const response = await fetchWithTimeout(proxyUrl, {}, 10000);
-      if (response.ok) {
-        console.log('✓ CORS proxy succeeded:', proxy.substring(0, 30));
-        return response;
+      const resp = await fetchWithTimeout(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      }, 6000);
+      if (resp.ok) {
+        const data = await resp.json();
+        const result = parseYahooData(data, yfSymbol);
+        if (result) { console.log(`✓ Direct: ${yfSymbol} = ${result.price}`); return result; }
       }
-    } catch (e) { /* try next proxy */ }
+    } catch (e) { /* CORS blocked, try proxy */ }
   }
 
-  console.log('✗ All fetch attempts failed for:', url.substring(0, 60));
+  // Try 2: corsproxy.io (no URL encoding needed)
+  try {
+    const proxyUrl = `https://corsproxy.io/?${baseUrl}`;
+    const resp = await fetchWithTimeout(proxyUrl, {}, 10000);
+    if (resp.ok) {
+      const data = await resp.json();
+      const result = parseYahooData(data, yfSymbol);
+      if (result) { console.log(`✓ Proxy1: ${yfSymbol} = ${result.price}`); return result; }
+    }
+  } catch (e) { /* try next */ }
+
+  // Try 3: allorigins proxy
+  try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(baseUrl)}`;
+    const resp = await fetchWithTimeout(proxyUrl, {}, 10000);
+    if (resp.ok) {
+      const data = await resp.json();
+      const result = parseYahooData(data, yfSymbol);
+      if (result) { console.log(`✓ Proxy2: ${yfSymbol} = ${result.price}`); return result; }
+    }
+  } catch (e) { /* try next */ }
+
+  // Try 4: thingproxy
+  try {
+    const proxyUrl = `https://thingproxy.freeboard.io/fetch/${baseUrl}`;
+    const resp = await fetchWithTimeout(proxyUrl, {}, 10000);
+    if (resp.ok) {
+      const data = await resp.json();
+      const result = parseYahooData(data, yfSymbol);
+      if (result) { console.log(`✓ Proxy3: ${yfSymbol} = ${result.price}`); return result; }
+    }
+  } catch (e) { /* all failed */ }
+
+  console.log(`✗ All attempts failed for: ${yfSymbol}`);
   return null;
 }
 
-// ===== FETCH USD/INR RATE =====
-async function fetchUSDINRRate() {
-  const apis = [
-    'https://api.exchangerate-api.com/v4/latest/USD',
-    'https://open.er-api.com/v6/latest/USD',
-    'https://api.fxratesapi.com/latest?base=USD&currencies=INR'
-  ];
-
-  for (const api of apis) {
-    try {
-      const response = await fetchWithTimeout(api, {}, 5000);
-      if (response.ok) {
-        const data = await response.json();
-        const rate = data.rates?.INR || data.conversion_rates?.INR;
-        if (rate && rate > 50 && rate < 200) {
-          usdInrRate = rate;
-          await MarketPricesDB.set('USD_INR', { price: rate, currency: 'INR', updatedAt: new Date().toISOString() });
-          updateExchangeRateDisplay();
-          console.log('✓ USD/INR rate:', rate);
-          return rate;
-        }
-      }
-    } catch (e) { /* try next */ }
-  }
-
-  // Try cached rate
-  try {
-    const cached = await MarketPricesDB.get('USD_INR');
-    if (cached && cached.price) {
-      usdInrRate = cached.price;
-      updateExchangeRateDisplay();
-      return usdInrRate;
-    }
-  } catch (e) {}
-
-  updateExchangeRateDisplay();
-  return usdInrRate;
-}
-
 // ===== PARSE YAHOO FINANCE RESPONSE =====
-function parseYahooResponse(data, symbol) {
+function parseYahooData(data, symbol) {
   try {
-    const result = data?.chart?.result?.[0];
-    if (!result) return null;
-    const meta = result.meta;
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
     const price = meta.regularMarketPrice || meta.previousClose;
-    const prevClose = meta.previousClose || meta.chartPreviousClose || price;
     if (!price || price <= 0) return null;
+    const prevClose = meta.chartPreviousClose || meta.previousClose || price;
     const change = price - prevClose;
     const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
     return {
@@ -144,214 +127,186 @@ function parseYahooResponse(data, symbol) {
       change,
       changePct,
       currency: meta.currency || 'USD',
-      name: meta.longName || meta.shortName || symbol,
+      name: meta.shortName || meta.longName || symbol,
       updatedAt: new Date().toISOString()
     };
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
-// ===== FETCH YAHOO PRICE =====
-async function fetchYahooPrice(symbol) {
-  const urls = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`
-  ];
-
-  for (const url of urls) {
-    try {
-      const response = await fetchWithCORSProxy(url);
-      if (response) {
-        const data = await response.json();
-        const result = parseYahooResponse(data, symbol);
-        if (result) {
-          console.log(`✓ Price fetched for ${symbol}: ${result.price} (${result.changePct.toFixed(2)}%)`);
-          return result;
-        }
-      }
-    } catch (e) { /* try next */ }
-  }
-  return null;
+// ===== NORMALIZE SYMBOL (same as DS_WEALTH_OS) =====
+function normalizeSymbol(symbol, exchange) {
+  const ex = (exchange || '').toUpperCase();
+  const base = symbol.replace(/\.(NS|BO|US|L)$/i, '').toUpperCase().trim();
+  if (ex === 'NSE') return base + '.NS';
+  if (ex === 'BSE') return base + '.BO';
+  return base;
 }
 
 // ===== FETCH INDIAN STOCK PRICE =====
 async function fetchIndianStockPrice(symbol) {
-  const cleanSymbol = symbol.replace('.NS', '').replace('.BO', '');
-  console.log(`Fetching Indian price for: ${cleanSymbol}`);
-
-  // Try NSE first, then BSE
+  const clean = symbol.replace('.NS', '').replace('.BO', '');
+  // Try NSE first, then BSE (same as DS_WEALTH_OS)
   for (const suffix of ['.NS', '.BO']) {
-    const result = await fetchYahooPrice(cleanSymbol + suffix);
-    if (result) {
-      result.currency = 'INR';
-      return result;
-    }
+    const result = await fetchYahooChart(clean + suffix);
+    if (result) { result.currency = 'INR'; return result; }
   }
-
-  // Try without suffix
-  const result = await fetchYahooPrice(cleanSymbol);
-  if (result) return result;
-
-  console.log(`✗ Could not fetch price for ${cleanSymbol}`);
   return null;
 }
 
 // ===== FETCH US STOCK PRICE =====
 async function fetchUSStockPrice(symbol) {
-  console.log(`Fetching US price for: ${symbol}`);
-  return await fetchYahooPrice(symbol);
+  return await fetchYahooChart(symbol);
 }
 
-// ===== FETCH CRYPTO PRICE (CoinGecko - supports CORS) =====
+// ===== FETCH CRYPTO (CoinGecko - CORS enabled) =====
 async function fetchCryptoPrice(symbol) {
   const coinMap = {
     'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana',
-    'BNB': 'binancecoin', 'ADA': 'cardano', 'XRP': 'ripple',
-    'DOGE': 'dogecoin', 'MATIC': 'matic-network', 'DOT': 'polkadot'
+    'BNB': 'binancecoin', 'ADA': 'cardano', 'XRP': 'ripple', 'DOGE': 'dogecoin'
   };
-
   const coinId = coinMap[symbol.toUpperCase()];
-  if (!coinId) return await fetchYahooPrice(symbol + '-USD');
-
-  try {
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`;
-    const response = await fetchWithTimeout(url, {}, 8000);
-    if (response.ok) {
-      const data = await response.json();
-      const coinData = data[coinId];
-      if (coinData) {
-        const price = coinData.usd;
-        const changePct = coinData.usd_24h_change || 0;
-        const prevClose = price / (1 + changePct / 100);
-        return {
-          price,
-          prevClose,
-          change: price - prevClose,
-          changePct,
-          currency: 'USD',
-          name: symbol,
-          updatedAt: new Date().toISOString()
-        };
+  if (coinId) {
+    try {
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true`;
+      const resp = await fetchWithTimeout(url, {}, 8000);
+      if (resp.ok) {
+        const data = await resp.json();
+        const d = data[coinId];
+        if (d && d.usd) {
+          const price = d.usd;
+          const changePct = d.usd_24h_change || 0;
+          const prevClose = price / (1 + changePct / 100);
+          return { price, prevClose, change: price - prevClose, changePct, currency: 'USD', name: symbol, updatedAt: new Date().toISOString() };
+        }
       }
-    }
-  } catch (e) {}
-
-  return await fetchYahooPrice(symbol + '-USD');
+    } catch (e) {}
+  }
+  return await fetchYahooChart(symbol + '-USD');
 }
 
-// ===== FETCH GOLD/SILVER PRICE =====
-async function fetchCommodityPrice(type) {
-  const symbolMap = { gold: 'GC=F', silver: 'SI=F', crude: 'CL=F', platinum: 'PL=F' };
-  const symbol = symbolMap[type.toLowerCase()];
-  if (!symbol) return null;
-  const result = await fetchYahooPrice(symbol);
-  if (result) result.currency = 'USD';
-  return result;
-}
-
-// ===== FETCH MUTUAL FUND NAV (India) =====
-async function fetchMutualFundNAV(schemeCode) {
+// ===== FETCH MUTUAL FUND NAV (mfapi.in - CORS enabled) =====
+async function fetchMutualFundNAV(symbol) {
   try {
-    const url = `https://api.mfapi.in/mf/${schemeCode}/latest`;
-    const response = await fetchWithTimeout(url, {}, 8000);
-    if (response.ok) {
-      const data = await response.json();
-      if (data.data && data.data.length > 0) {
-        const nav = parseFloat(data.data[0].nav);
-        const prevNav = data.data.length > 1 ? parseFloat(data.data[1].nav) : nav;
-        return {
-          price: nav,
-          prevClose: prevNav,
-          change: nav - prevNav,
-          changePct: prevNav > 0 ? ((nav - prevNav) / prevNav) * 100 : 0,
-          currency: 'INR',
-          name: data.meta?.scheme_name || 'Mutual Fund',
-          updatedAt: new Date().toISOString()
-        };
+    const searchUrl = `https://api.mfapi.in/mf/search?q=${encodeURIComponent(symbol)}`;
+    const resp = await fetchWithTimeout(searchUrl, {}, 8000);
+    if (resp.ok) {
+      const results = await resp.json();
+      if (results && results.length > 0) {
+        const schemeCode = results[0].schemeCode;
+        const navResp = await fetchWithTimeout(`https://api.mfapi.in/mf/${schemeCode}`, {}, 8000);
+        if (navResp.ok) {
+          const navData = await navResp.json();
+          if (navData?.data?.length >= 1) {
+            const latest = navData.data[0];
+            const prev = navData.data[1] || latest;
+            const nav = parseFloat(latest.nav);
+            const prevNav = parseFloat(prev.nav);
+            if (nav > 0) {
+              return {
+                price: nav, prevClose: prevNav, change: nav - prevNav,
+                changePct: prevNav > 0 ? ((nav - prevNav) / prevNav) * 100 : 0,
+                currency: 'INR', name: navData.meta?.scheme_name || symbol,
+                updatedAt: new Date().toISOString()
+              };
+            }
+          }
+        }
       }
     }
   } catch (e) {}
   return null;
+}
+
+// ===== FETCH USD/INR RATE =====
+async function fetchUSDINRRate() {
+  // Try Yahoo Finance USDINR=X first (same as DS_WEALTH_OS)
+  const result = await fetchYahooChart('USDINR=X');
+  if (result && result.price > 50 && result.price < 200) {
+    usdInrRate = result.price;
+    await MarketPricesDB.set('USD_INR', { price: usdInrRate, currency: 'INR', updatedAt: new Date().toISOString() });
+    updateExchangeRateDisplay();
+    console.log('✓ USD/INR:', usdInrRate);
+    return usdInrRate;
+  }
+
+  // Fallback to exchange rate APIs
+  const apis = [
+    'https://api.exchangerate-api.com/v4/latest/USD',
+    'https://open.er-api.com/v6/latest/USD'
+  ];
+  for (const api of apis) {
+    try {
+      const resp = await fetchWithTimeout(api, {}, 5000);
+      if (resp.ok) {
+        const data = await resp.json();
+        const rate = data.rates?.INR || data.conversion_rates?.INR;
+        if (rate && rate > 50 && rate < 200) {
+          usdInrRate = rate;
+          await MarketPricesDB.set('USD_INR', { price: rate, currency: 'INR', updatedAt: new Date().toISOString() });
+          updateExchangeRateDisplay();
+          return rate;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Use cached
+  try {
+    const cached = await MarketPricesDB.get('USD_INR');
+    if (cached?.price) { usdInrRate = cached.price; updateExchangeRateDisplay(); return usdInrRate; }
+  } catch (e) {}
+
+  updateExchangeRateDisplay();
+  return usdInrRate;
 }
 
 // ===== BATCH FETCH PRICES =====
 async function fetchPricesForHoldings(holdings) {
   const results = {};
   const errors = [];
-  let successCount = 0;
 
-  const indianHoldings = holdings.filter(h => h.market === 'indian');
-  const usHoldings = holdings.filter(h => h.market === 'us' || h.market === 'rsu');
+  const indian = holdings.filter(h => h.market === 'indian');
+  const us = holdings.filter(h => h.market === 'us' || h.market === 'rsu');
 
-  console.log(`Fetching prices for ${indianHoldings.length} Indian + ${usHoldings.length} US holdings`);
+  console.log(`Fetching: ${indian.length} Indian + ${us.length} US holdings`);
 
-  // Fetch Indian prices
-  for (const h of indianHoldings) {
+  for (const h of indian) {
     try {
-      const price = await fetchIndianStockPrice(h.symbol);
+      // Check if it's a mutual fund (ISIN starts with INF)
+      const isMF = h.isin && h.isin.startsWith('INF') && (h.type === 'mf');
+      let price = null;
+      if (isMF) {
+        price = await fetchMutualFundNAV(h.symbol);
+      }
+      if (!price) {
+        price = await fetchIndianStockPrice(h.symbol);
+      }
       if (price) {
         results[h.symbol] = price;
         await MarketPricesDB.set(h.symbol, price);
-        successCount++;
       } else {
         errors.push(h.symbol);
       }
-      await sleep(200); // Rate limiting
-    } catch (e) {
-      errors.push(h.symbol);
-    }
+      await sleep(300);
+    } catch (e) { errors.push(h.symbol); }
   }
 
-  // Fetch US prices
-  for (const h of usHoldings) {
+  for (const h of us) {
     try {
       const price = await fetchUSStockPrice(h.symbol);
       if (price) {
         results[h.symbol] = price;
         await MarketPricesDB.set(h.symbol, price);
-        successCount++;
       } else {
         errors.push(h.symbol);
       }
-      await sleep(200);
-    } catch (e) {
-      errors.push(h.symbol);
-    }
+      await sleep(300);
+    } catch (e) { errors.push(h.symbol); }
   }
 
-  console.log(`Price fetch complete: ${successCount} success, ${errors.length} failed`);
-  if (errors.length > 0) console.log('Failed symbols:', errors.join(', '));
-
+  console.log(`Done: ${Object.keys(results).length} success, ${errors.length} failed`);
+  if (errors.length > 0) console.log('Failed:', errors.join(', '));
   return results;
-}
-
-// ===== GET CACHED OR FETCH PRICE =====
-async function getPrice(symbol, market) {
-  try {
-    const cached = await MarketPricesDB.get(symbol);
-    const isStale = !cached || (Date.now() - new Date(cached.updatedAt || 0).getTime()) > 15 * 60 * 1000;
-
-    if (cached && !isStale) return cached;
-
-    let price = null;
-    if (market === 'indian') {
-      price = await fetchIndianStockPrice(symbol);
-    } else if (market === 'crypto') {
-      price = await fetchCryptoPrice(symbol);
-    } else {
-      price = await fetchUSStockPrice(symbol);
-    }
-
-    if (price) {
-      await MarketPricesDB.set(symbol, price);
-      return price;
-    }
-
-    return cached || { price: 0, change: 0, changePct: 0, currency: market === 'indian' ? 'INR' : 'USD' };
-  } catch (e) {
-    return { price: 0, change: 0, changePct: 0, currency: market === 'indian' ? 'INR' : 'USD' };
-  }
 }
 
 // ===== REFRESH ALL MARKET DATA =====
@@ -364,46 +319,38 @@ async function refreshMarketData() {
 
   try {
     showToast('🔄 Fetching live prices...');
-
-    // Fetch USD/INR rate
     await fetchUSDINRRate();
 
-    // Get all holdings
     const holdings = await HoldingsDB.getAll(currentUser.id);
     if (holdings.length === 0) {
       showToast('No holdings to refresh. Add holdings first.');
       return;
     }
 
-    // Fetch prices
     const prices = await fetchPricesForHoldings(holdings);
     marketDataCache = prices;
     lastRefreshTime = new Date();
 
     const successCount = Object.keys(prices).length;
-    const totalCount = holdings.length;
-
-    // Update displays
     await renderPortfolioPage();
     await renderDashboard();
 
     if (successCount > 0) {
-      showToast(`✅ Updated ${successCount}/${totalCount} prices`);
+      showToast(`✅ Updated ${successCount}/${holdings.length} prices`);
     } else {
-      showToast('⚠️ Could not fetch live prices. Check internet connection.', 'error');
+      showToast('⚠️ Could not fetch prices. Check console for details.', 'error');
     }
     updateLastRefreshTime();
-
   } catch (e) {
-    console.error('Market refresh error:', e);
-    showToast('Price refresh failed. Using cached data.', 'error');
+    console.error('Refresh error:', e);
+    showToast('Price refresh failed.', 'error');
   } finally {
     isRefreshing = false;
     if (refreshBtn) refreshBtn.style.animation = '';
   }
 }
 
-// ===== UPDATE LAST REFRESH TIME =====
+// ===== UPDATE DISPLAYS =====
 function updateLastRefreshTime() {
   const el = document.getElementById('last-refresh-time');
   if (el && lastRefreshTime) {
@@ -411,13 +358,12 @@ function updateLastRefreshTime() {
   }
 }
 
-// ===== UPDATE EXCHANGE RATE DISPLAY =====
 function updateExchangeRateDisplay() {
-  const rateEl = document.getElementById('usd-inr-rate');
-  if (rateEl) rateEl.textContent = '₹' + usdInrRate.toFixed(2);
+  const el = document.getElementById('usd-inr-rate');
+  if (el) el.textContent = '₹' + usdInrRate.toFixed(2);
 }
 
-// ===== GET SECTOR FOR SYMBOL =====
+// ===== SECTOR =====
 function getSectorForSymbol(symbol) {
   return SECTOR_MAP[symbol ? symbol.toUpperCase() : ''] || 'Other';
 }
@@ -428,16 +374,14 @@ function calculateHoldingMetrics(holding, priceData) {
   const avgPrice = parseFloat(holding.avgPrice) || 0;
   const currentPrice = (priceData && priceData.price > 0) ? priceData.price : avgPrice;
   const currency = holding.market === 'indian' ? 'INR' : 'USD';
-
   const investedAmount = qty * avgPrice;
   const currentValue = qty * currentPrice;
   const pnl = currentValue - investedAmount;
   const pnlPct = investedAmount > 0 ? (pnl / investedAmount) * 100 : 0;
-  const todayChange = (priceData && priceData.change) ? priceData.change : 0;
-  const todayChangePct = (priceData && priceData.changePct) ? priceData.changePct : 0;
+  const todayChange = priceData?.change || 0;
+  const todayChangePct = priceData?.changePct || 0;
   const todayGainLoss = qty * todayChange;
   const multiplier = currency === 'USD' ? usdInrRate : 1;
-
   return {
     qty, avgPrice, currentPrice, investedAmount, currentValue, pnl, pnlPct,
     todayChange, todayChangePct, todayGainLoss, currency,
@@ -461,27 +405,18 @@ async function calculatePortfolioTotals(userId) {
   let usInvested = 0, usCurrent = 0;
   let rsuInvested = 0, rsuCurrent = 0;
 
-  for (const holding of holdings) {
-    const m = calculateHoldingMetrics(holding, priceMap[holding.symbol]);
+  for (const h of holdings) {
+    const m = calculateHoldingMetrics(h, priceMap[h.symbol]);
     totalInvestedINR += m.investedINR;
     totalCurrentINR += m.currentValueINR;
     totalTodayGainINR += m.todayGainLossINR;
-
-    if (holding.market === 'indian') {
-      indianInvested += m.investedAmount;
-      indianCurrent += m.currentValue;
-    } else if (holding.market === 'rsu') {
-      rsuInvested += m.investedAmount;
-      rsuCurrent += m.currentValue;
-    } else {
-      usInvested += m.investedAmount;
-      usCurrent += m.currentValue;
-    }
+    if (h.market === 'indian') { indianInvested += m.investedAmount; indianCurrent += m.currentValue; }
+    else if (h.market === 'rsu') { rsuInvested += m.investedAmount; rsuCurrent += m.currentValue; }
+    else { usInvested += m.investedAmount; usCurrent += m.currentValue; }
   }
 
   const totalPnlINR = totalCurrentINR - totalInvestedINR;
   const totalReturns = totalInvestedINR > 0 ? (totalPnlINR / totalInvestedINR) * 100 : 0;
-
   return {
     totalInvestedINR, totalCurrentINR, totalPnlINR, totalReturns, totalTodayGainINR,
     indianInvested, indianCurrent, usInvested, usCurrent, rsuInvested, rsuCurrent,
@@ -495,37 +430,56 @@ async function calculateRealizedPnL(userId) {
     const trades = await TradesDB.getAll(userId);
     const sellTrades = trades.filter(t => t.type === 'SELL');
     let totalRealizedPnLINR = 0;
-
     for (const sell of sellTrades) {
-      const buyTrades = trades.filter(t =>
-        t.symbol === sell.symbol && t.type === 'BUY' && new Date(t.date) <= new Date(sell.date)
-      );
+      const buyTrades = trades.filter(t => t.symbol === sell.symbol && t.type === 'BUY' && new Date(t.date) <= new Date(sell.date));
       if (buyTrades.length > 0) {
         const totalBuyQty = buyTrades.reduce((s, t) => s + t.quantity, 0);
-        const avgBuyPrice = totalBuyQty > 0 ?
-          buyTrades.reduce((s, t) => s + t.price * t.quantity, 0) / totalBuyQty : 0;
+        const avgBuyPrice = totalBuyQty > 0 ? buyTrades.reduce((s, t) => s + t.price * t.quantity, 0) / totalBuyQty : 0;
         const pnl = (sell.price - avgBuyPrice) * sell.quantity;
         const multiplier = (sell.market === 'us' || sell.market === 'rsu') ? usdInrRate : 1;
         totalRealizedPnLINR += pnl * multiplier;
       }
     }
     return { totalRealizedPnLINR };
-  } catch (e) {
-    return { totalRealizedPnLINR: 0 };
-  }
+  } catch (e) { return { totalRealizedPnLINR: 0 }; }
 }
 
-// ===== CALCULATE XIRR =====
+// ===== UTILITIES =====
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function formatCurrency(amount, currency = 'INR', compact = false) {
+  if (isNaN(amount) || amount == null) return currency === 'INR' ? '₹0' : '$0';
+  const abs = Math.abs(amount);
+  const sym = currency === 'INR' ? '₹' : '$';
+  if (compact) {
+    if (abs >= 10000000) return sym + (amount / 10000000).toFixed(2) + 'Cr';
+    if (abs >= 100000) return sym + (amount / 100000).toFixed(2) + 'L';
+    if (abs >= 1000) return sym + (amount / 1000).toFixed(1) + 'K';
+  }
+  return sym + abs.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+function formatPct(value) {
+  if (isNaN(value)) return '0.00%';
+  return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
+}
+
+function formatPnL(amount, currency = 'INR') {
+  return (amount >= 0 ? '+' : '-') + formatCurrency(Math.abs(amount), currency);
+}
+
+function getPnLClass(value) { return value >= 0 ? 'positive' : 'negative'; }
+
 function calculateXIRR(cashflows) {
   if (!cashflows || cashflows.length < 2) return 0;
   let rate = 0.1;
-  for (let iter = 0; iter < 100; iter++) {
+  for (let i = 0; i < 100; i++) {
     let npv = 0, dnpv = 0;
     const t0 = new Date(cashflows[0].date).getTime();
     for (const cf of cashflows) {
-      const years = (new Date(cf.date).getTime() - t0) / (365.25 * 24 * 3600 * 1000);
-      npv += cf.amount / Math.pow(1 + rate, years);
-      dnpv -= years * cf.amount / Math.pow(1 + rate, years + 1);
+      const y = (new Date(cf.date).getTime() - t0) / (365.25 * 24 * 3600 * 1000);
+      npv += cf.amount / Math.pow(1 + rate, y);
+      dnpv -= y * cf.amount / Math.pow(1 + rate, y + 1);
     }
     if (Math.abs(npv) < 0.01 || dnpv === 0) break;
     rate = rate - npv / dnpv;
@@ -534,38 +488,9 @@ function calculateXIRR(cashflows) {
   return rate * 100;
 }
 
-// ===== CALCULATE CAGR =====
-function calculateCAGR(initialValue, finalValue, years) {
-  if (initialValue <= 0 || years <= 0) return 0;
-  return (Math.pow(finalValue / initialValue, 1 / years) - 1) * 100;
+function calculateCAGR(iv, fv, years) {
+  if (iv <= 0 || years <= 0) return 0;
+  return (Math.pow(fv / iv, 1 / years) - 1) * 100;
 }
-
-// ===== UTILITY FUNCTIONS =====
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-function formatCurrency(amount, currency = 'INR', compact = false) {
-  if (isNaN(amount) || amount === null || amount === undefined) return currency === 'INR' ? '₹0' : '$0';
-  const abs = Math.abs(amount);
-  const symbol = currency === 'INR' ? '₹' : '$';
-  if (compact) {
-    if (abs >= 10000000) return symbol + (amount / 10000000).toFixed(2) + 'Cr';
-    if (abs >= 100000) return symbol + (amount / 100000).toFixed(2) + 'L';
-    if (abs >= 1000) return symbol + (amount / 1000).toFixed(1) + 'K';
-  }
-  return symbol + abs.toLocaleString('en-IN', { maximumFractionDigits: 2 });
-}
-
-function formatPct(value) {
-  if (isNaN(value)) return '0.00%';
-  const sign = value >= 0 ? '+' : '';
-  return sign + value.toFixed(2) + '%';
-}
-
-function formatPnL(amount, currency = 'INR') {
-  const sign = amount >= 0 ? '+' : '-';
-  return sign + formatCurrency(Math.abs(amount), currency);
-}
-
-function getPnLClass(value) { return value >= 0 ? 'positive' : 'negative'; }
 
 function showNotifications() { showToast('No new notifications'); }

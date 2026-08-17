@@ -139,6 +139,115 @@ async function runOnboarding() {
   }
 }
 
+// ===== SHOW P&L BREAKDOWN MODAL =====
+async function showPnLBreakdown(type) {
+  if (!currentUser) return;
+  const holdings = await HoldingsDB.getAll(currentUser.id);
+  const prices = await MarketPricesDB.getAll();
+  const priceMap = {};
+  prices.forEach(p => { priceMap[p.symbol] = p; });
+
+  const indianHoldings = holdings.filter(h => h.market === 'indian');
+  const usHoldings = holdings.filter(h => h.market === 'us');
+  const rsuHoldings = holdings.filter(h => h.market === 'rsu');
+
+  const calcTotal = (list) => {
+    let invested = 0, current = 0;
+    list.forEach(h => {
+      const m = calculateHoldingMetrics(h, priceMap[h.symbol]);
+      invested += m.investedINR;
+      current += m.currentValueINR;
+    });
+    return { invested, current, pnl: current - invested, pct: invested > 0 ? ((current - invested) / invested) * 100 : 0 };
+  };
+
+  const indian = calcTotal(indianHoldings);
+  const us = calcTotal(usHoldings);
+  const rsu = calcTotal(rsuHoldings);
+  const total = calcTotal(holdings);
+
+  const title = type === 'unrealized' ? 'Unrealized P&L Breakdown' : 'Realized P&L Breakdown';
+
+  // Show in a toast-style overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:600;
+    display:flex; align-items:flex-end; justify-content:center;
+  `;
+  overlay.innerHTML = `
+    <div style="
+      background:var(--bg-secondary); border-radius:24px 24px 0 0;
+      padding:24px 20px; width:100%; max-width:600px;
+      border:1px solid var(--border-color); animation:slideUp 0.3s ease;
+    ">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h3 style="font-size:1.1rem; font-weight:700;">${title}</h3>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="
+          background:var(--bg-input); border:1px solid var(--border-color);
+          border-radius:8px; width:32px; height:32px; cursor:pointer;
+          color:var(--text-secondary); font-size:1rem;
+        ">✕</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <!-- Indian -->
+        <div style="padding:14px; background:var(--glass-bg); border-radius:14px; border:1px solid var(--glass-border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:600;">🇮🇳 Indian Portfolio</span>
+            <span class="${getPnLClass(indian.pnl)}" style="font-weight:700;">${formatPnL(indian.pnl)}</span>
+          </div>
+          <div style="display:flex; gap:16px; font-size:0.8rem; color:var(--text-muted);">
+            <span>Invested: ${formatCurrency(indian.invested, 'INR', true)}</span>
+            <span>Current: ${formatCurrency(indian.current, 'INR', true)}</span>
+            <span class="${getPnLClass(indian.pct)}">${formatPct(indian.pct)}</span>
+          </div>
+        </div>
+
+        <!-- US -->
+        <div style="padding:14px; background:var(--glass-bg); border-radius:14px; border:1px solid var(--glass-border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:600;">🇺🇸 US Portfolio</span>
+            <span class="${getPnLClass(us.pnl)}" style="font-weight:700;">${formatPnL(us.pnl)}</span>
+          </div>
+          <div style="display:flex; gap:16px; font-size:0.8rem; color:var(--text-muted);">
+            <span>Invested: ${formatCurrency(us.invested, 'INR', true)}</span>
+            <span>Current: ${formatCurrency(us.current, 'INR', true)}</span>
+            <span class="${getPnLClass(us.pct)}">${formatPct(us.pct)}</span>
+          </div>
+        </div>
+
+        <!-- RSU -->
+        <div style="padding:14px; background:var(--glass-bg); border-radius:14px; border:1px solid var(--glass-border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:600;">🏢 RSU Holdings</span>
+            <span class="${getPnLClass(rsu.pnl)}" style="font-weight:700;">${formatPnL(rsu.pnl)}</span>
+          </div>
+          <div style="display:flex; gap:16px; font-size:0.8rem; color:var(--text-muted);">
+            <span>Invested: ${formatCurrency(rsu.invested, 'INR', true)}</span>
+            <span>Current: ${formatCurrency(rsu.current, 'INR', true)}</span>
+            <span class="${getPnLClass(rsu.pct)}">${formatPct(rsu.pct)}</span>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div style="padding:14px; background:rgba(108,99,255,0.1); border-radius:14px; border:1px solid rgba(108,99,255,0.3);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:700;">📊 Total Portfolio</span>
+            <span class="${getPnLClass(total.pnl)}" style="font-weight:800; font-size:1.1rem;">${formatPnL(total.pnl)}</span>
+          </div>
+          <div style="display:flex; gap:16px; font-size:0.8rem; color:var(--text-muted);">
+            <span>Invested: ${formatCurrency(total.invested, 'INR', true)}</span>
+            <span>Current: ${formatCurrency(total.current, 'INR', true)}</span>
+            <span class="${getPnLClass(total.pct)}" style="font-weight:700;">${formatPct(total.pct)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+}
+
 // ===== RENDER DASHBOARD =====
 async function renderDashboard() {
   if (!currentUser) {

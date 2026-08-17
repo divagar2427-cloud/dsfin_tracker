@@ -23,7 +23,7 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
       }
     </script>
-    <link rel="stylesheet" href="css/app.css?v=5">
+    <link rel="stylesheet" href="css/app.css?v=6">
 </head>
 <body>
 
@@ -175,21 +175,21 @@
                 </div>
             </div>
             <div class="stats-grid">
-                <div class="stat-card glass-card">
+                <div class="stat-card glass-card" onclick="showPnLBreakdown('unrealized')" style="cursor:pointer;" title="Click for breakdown">
                     <div class="stat-icon">📈</div>
                     <div class="stat-info">
-                        <div class="stat-label">Unrealized P&L</div>
+                        <div class="stat-label">Unrealized P&L ↗</div>
                         <div class="stat-value positive" id="unrealized-pnl">₹0</div>
                     </div>
                 </div>
-                <div class="stat-card glass-card">
+                <div class="stat-card glass-card" onclick="showPnLBreakdown('realized')" style="cursor:pointer;" title="Click for breakdown">
                     <div class="stat-icon">💰</div>
                     <div class="stat-info">
-                        <div class="stat-label">Realized P&L</div>
+                        <div class="stat-label">Realized P&L ↗</div>
                         <div class="stat-value" id="realized-pnl">₹0</div>
                     </div>
                 </div>
-                <div class="stat-card glass-card">
+                <div class="stat-card glass-card" onclick="showPnLBreakdown('unrealized')" style="cursor:pointer;">
                     <div class="stat-icon">📊</div>
                     <div class="stat-info">
                         <div class="stat-label">Today's Gain</div>
@@ -827,20 +827,20 @@
 </div>
 
 <!-- Scripts with cache busting -->
-<script src="js/db.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
-<script src="js/market.js?v=5"></script>
-<script src="js/portfolio.js?v=5"></script>
-<script src="js/upload.js?v=5"></script>
-<script src="js/assets.js?v=5"></script>
-<script src="js/goals.js?v=5"></script>
-<script src="js/money.js?v=5"></script>
-<script src="js/trades.js?v=5"></script>
-<script src="js/rebalancing.js?v=5"></script>
-<script src="js/reentry.js?v=5"></script>
-<script src="js/groups.js?v=5"></script>
-<script src="js/charts.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/db.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/market.js?v=6"></script>
+<script src="js/portfolio.js?v=6"></script>
+<script src="js/upload.js?v=6"></script>
+<script src="js/assets.js?v=6"></script>
+<script src="js/goals.js?v=6"></script>
+<script src="js/money.js?v=6"></script>
+<script src="js/trades.js?v=6"></script>
+<script src="js/rebalancing.js?v=6"></script>
+<script src="js/reentry.js?v=6"></script>
+<script src="js/groups.js?v=6"></script>
+<script src="js/charts.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 
 </body>
 </html>
