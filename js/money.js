@@ -163,7 +163,7 @@ function showAddTransactionModal() {
   document.getElementById('add-transaction-form').reset();
   document.getElementById('transaction-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('transaction-type').value = 'income';
-  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
 }
 
 // ===== SET TRANSACTION TYPE =====

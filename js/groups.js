@@ -108,7 +108,7 @@ function showAddGroupModal(groupId = null) {
     }
   });
 
-  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
 }
 
 // ===== SAVE GROUP =====

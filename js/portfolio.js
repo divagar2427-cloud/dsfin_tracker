@@ -179,7 +179,6 @@ function showAddHoldingModal(holdingId = null) {
   if (!modal) return;
 
   if (holdingId) {
-    // Edit mode
     HoldingsDB.getAll(currentUser.id).then(holdings => {
       const h = holdings.find(h => h.id === holdingId);
       if (h) {
@@ -198,7 +197,7 @@ function showAddHoldingModal(holdingId = null) {
     delete modal.dataset.editId;
   }
 
-  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
 }
 
 // ===== SAVE HOLDING =====

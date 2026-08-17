@@ -187,7 +187,7 @@ function showAddAssetModal(assetId = null) {
     delete modal.dataset.editId;
   }
 
-  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
 }
 
 // ===== UPDATE ASSET FORM =====

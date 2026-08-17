@@ -78,26 +78,16 @@ async function resetPassword(userId, newPassword) {
   await UserDB.update(userId, { password: hashedPassword });
 }
 
-// Show auth section
-function showAuthSection() {
-  document.getElementById('splash-screen').classList.add('hidden');
-  document.getElementById('auth-section').classList.remove('hidden');
-  document.getElementById('app-section').classList.add('hidden');
-  showPage('login-page');
-}
-
-// Show app section
-function showAppSection() {
-  document.getElementById('splash-screen').classList.add('hidden');
-  document.getElementById('auth-section').classList.add('hidden');
-  document.getElementById('app-section').classList.remove('hidden');
-  updateProfileDisplay();
-}
+// Show auth section - handled by app.js showAuthSection()
+// Show app section - handled by app.js showAppSection()
 
 // Show specific auth page
 function showPage(pageId) {
-  document.querySelectorAll('.auth-page').forEach(p => p.classList.add('hidden'));
-  document.getElementById(pageId).classList.remove('hidden');
+  document.querySelectorAll('.auth-page').forEach(p => {
+    p.style.display = 'none';
+  });
+  const page = document.getElementById(pageId);
+  if (page) page.style.display = 'flex';
 }
 
 // Toggle password visibility

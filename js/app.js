@@ -5,18 +5,27 @@ let currentPage = 'dashboard';
 // ===== APP INITIALIZATION =====
 async function initApp() {
   try {
+    console.log('Initializing DS Wealth Tracker...');
+    
     // Initialize IndexedDB
     await initDB();
+    console.log('DB initialized');
 
     // Check auth state
     const isLoggedIn = await initAuth();
+    console.log('Auth checked, logged in:', isLoggedIn);
 
-    // Hide splash after 2 seconds
+    // Setup auth forms
+    setupAuthForms();
+
+    // Hide splash after 1.5 seconds
     setTimeout(() => {
       const splash = document.getElementById('splash-screen');
       if (splash) {
         splash.style.opacity = '0';
-        setTimeout(() => splash.classList.add('hidden'), 500);
+        setTimeout(() => {
+          splash.style.display = 'none';
+        }, 500);
       }
 
       if (isLoggedIn) {
@@ -25,25 +34,68 @@ async function initApp() {
       } else {
         showAuthSection();
       }
-    }, 2000);
+    }, 1500);
 
-    // Setup auth forms
-    setupAuthForms();
-
-    // Register service worker
+    // Register service worker (non-blocking)
     registerServiceWorker();
 
   } catch (err) {
     console.error('App init error:', err);
+    // Show auth section on error
+    const splash = document.getElementById('splash-screen');
+    if (splash) splash.style.display = 'none';
     showAuthSection();
   }
+}
+
+// ===== SHOW AUTH SECTION =====
+function showAuthSection() {
+  const splash = document.getElementById('splash-screen');
+  const auth = document.getElementById('auth-section');
+  const app = document.getElementById('app-section');
+  
+  if (splash) splash.style.display = 'none';
+  if (auth) auth.style.display = 'flex';
+  if (app) app.style.display = 'none';
+  
+  showPage('login-page');
+}
+
+// ===== SHOW APP SECTION =====
+function showAppSection() {
+  const splash = document.getElementById('splash-screen');
+  const auth = document.getElementById('auth-section');
+  const app = document.getElementById('app-section');
+  
+  if (splash) splash.style.display = 'none';
+  if (auth) auth.style.display = 'none';
+  if (app) app.style.display = 'block';
+  
+  // Initialize all pages as hidden using inline styles
+  document.querySelectorAll('.page').forEach(p => {
+    p.style.display = 'none';
+    p.classList.remove('active');
+    p.classList.remove('hidden');
+  });
+  
+  // Show dashboard by default
+  const dashboard = document.getElementById('page-dashboard');
+  if (dashboard) {
+    dashboard.style.display = 'block';
+    dashboard.classList.add('active');
+  }
+  
+  updateProfileDisplay();
+  console.log('App section shown, dashboard visible');
 }
 
 // ===== INITIALIZE APP AFTER LOGIN =====
 async function initializeApp() {
   try {
-    // Fetch USD/INR rate
-    fetchUSDINRRate().catch(() => {});
+    console.log('Initializing app features...');
+    
+    // Fetch USD/INR rate (non-blocking)
+    fetchUSDINRRate().catch(e => console.log('USD/INR fetch failed:', e));
 
     // Render dashboard
     await renderDashboard();
@@ -62,9 +114,14 @@ async function initializeApp() {
 
 // ===== RENDER DASHBOARD =====
 async function renderDashboard() {
-  if (!currentUser) return;
+  if (!currentUser) {
+    console.log('No current user, skipping dashboard render');
+    return;
+  }
 
   try {
+    console.log('Rendering dashboard...');
+    
     const holdings = await HoldingsDB.getAll(currentUser.id);
     const prices = await MarketPricesDB.getAll();
     const priceMap = {};
@@ -133,6 +190,8 @@ async function renderDashboard() {
 
     // Save portfolio snapshot
     await savePortfolioSnapshot(totalNetWorth);
+    
+    console.log('Dashboard rendered successfully');
 
   } catch (err) {
     console.error('Dashboard render error:', err);
@@ -141,72 +200,81 @@ async function renderDashboard() {
 
 // ===== NAVIGATE TO PAGE =====
 function navigateTo(page) {
+  console.log('Navigating to:', page);
   currentPage = page;
 
-  // Hide all pages (remove active, add hidden)
+  // Hide ALL pages using inline styles (most reliable method)
   document.querySelectorAll('.page').forEach(p => {
+    p.style.display = 'none';
     p.classList.remove('active');
-    p.classList.add('hidden');
   });
 
-  // Show target page (remove hidden, add active)
-  const targetPage = document.getElementById(`page-${page}`);
+  // Show target page using inline styles
+  const targetPage = document.getElementById('page-' + page);
   if (targetPage) {
-    targetPage.classList.remove('hidden');
+    targetPage.style.display = 'block';
     targetPage.classList.add('active');
+    console.log('Page shown:', page);
+  } else {
+    console.error('Page not found:', 'page-' + page);
   }
 
-  // Update bottom nav
+  // Update bottom nav active state
   document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.page === page);
+    const isActive = btn.dataset.page === page;
+    btn.classList.toggle('active', isActive);
   });
 
   // Render page content
   renderPage(page);
 
   // Scroll to top
-  document.querySelector('.page-container')?.scrollTo(0, 0);
+  const container = document.querySelector('.page-container');
+  if (container) container.scrollTop = 0;
 }
 
 // ===== RENDER PAGE =====
 async function renderPage(page) {
-  switch (page) {
-    case 'dashboard':
-      await renderDashboard();
-      break;
-    case 'portfolio':
-      await renderPortfolioPage();
-      break;
-    case 'assets':
-      await renderAssetsPage();
-      break;
-    case 'goals':
-      await renderGoalsPage();
-      break;
-    case 'money':
-      await renderMoneyPage();
-      break;
-    case 'trades':
-      await renderTradesPage();
-      break;
-    case 'rebalancing':
-      await renderRebalancingPage();
-      break;
-    case 'reentry':
-      await renderReentryPage();
-      break;
-    case 'groups':
-      await renderGroupsPage();
-      break;
-    case 'comparison':
-      await renderSoldStocks();
-      break;
-    case 'settings':
-      updateProfileDisplay();
-      break;
-    case 'upload':
-      // Reset upload status
-      break;
+  try {
+    switch (page) {
+      case 'dashboard':
+        await renderDashboard();
+        break;
+      case 'portfolio':
+        await renderPortfolioPage();
+        break;
+      case 'assets':
+        await renderAssetsPage();
+        break;
+      case 'goals':
+        await renderGoalsPage();
+        break;
+      case 'money':
+        await renderMoneyPage();
+        break;
+      case 'trades':
+        await renderTradesPage();
+        break;
+      case 'rebalancing':
+        await renderRebalancingPage();
+        break;
+      case 'reentry':
+        await renderReentryPage();
+        break;
+      case 'groups':
+        await renderGroupsPage();
+        break;
+      case 'comparison':
+        await renderSoldStocks();
+        break;
+      case 'settings':
+        updateProfileDisplay();
+        break;
+      case 'upload':
+        break;
+    }
+  } catch (err) {
+    console.error('Render page error for', page, ':', err);
   }
 }
 
@@ -229,29 +297,35 @@ function toggleTheme() {
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.textContent = newTheme === 'dark' ? '🌙' : '☀️';
 
-  // Save preference
   if (currentUser) {
     UserDB.updateSettings(currentUser.id, { theme: newTheme });
     currentUser.settings.theme = newTheme;
   }
 
-  // Re-render charts with new theme
   destroyAllCharts();
   if (currentPage === 'dashboard') renderDashboard();
 }
 
 // ===== SHOW/HIDE MORE MENU =====
 function showMoreMenu() {
-  document.getElementById('more-menu')?.classList.remove('hidden');
+  const menu = document.getElementById('more-menu');
+  if (menu) menu.style.display = 'flex';
 }
 
 function hideMoreMenu() {
-  document.getElementById('more-menu')?.classList.add('hidden');
+  const menu = document.getElementById('more-menu');
+  if (menu) menu.style.display = 'none';
 }
 
 // ===== MODAL MANAGEMENT =====
 function closeModal(modalId) {
-  document.getElementById(modalId)?.classList.add('hidden');
+  const modal = document.getElementById(modalId);
+  if (modal) modal.style.display = 'none';
+}
+
+function openModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.style.display = 'flex';
 }
 
 // ===== TOAST NOTIFICATION =====
@@ -262,16 +336,14 @@ function showToast(message, type = 'success') {
   if (!toast || !toastMsg) return;
 
   toastMsg.textContent = message;
-  toast.style.background = type === 'error' ? 'rgba(255,101,132,0.15)' :
-                           type === 'success' ? 'var(--bg-secondary)' : 'var(--bg-secondary)';
+  toast.style.background = type === 'error' ? 'rgba(255,101,132,0.15)' : 'var(--bg-secondary)';
   toast.style.borderColor = type === 'error' ? 'rgba(255,101,132,0.3)' : 'var(--border-color)';
   toast.style.color = type === 'error' ? 'var(--negative)' : 'var(--text-primary)';
-
-  toast.classList.remove('hidden');
+  toast.style.display = 'block';
 
   if (toastTimeout) clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => {
-    toast.classList.add('hidden');
+    toast.style.display = 'none';
   }, 3000);
 }
 
@@ -279,28 +351,22 @@ function showToast(message, type = 'success') {
 function showLoading(text = 'Loading...') {
   const overlay = document.getElementById('loading-overlay');
   const loadingText = document.getElementById('loading-text');
-  if (overlay) overlay.classList.remove('hidden');
+  if (overlay) overlay.style.display = 'flex';
   if (loadingText) loadingText.textContent = text;
 }
 
 function hideLoading() {
-  document.getElementById('loading-overlay')?.classList.add('hidden');
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
 // ===== REGISTER SERVICE WORKER =====
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').then(reg => {
-      console.log('SW registered:', reg.scope);
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      console.log('SW registered');
     }).catch(err => {
-      console.log('SW registration failed:', err);
-    });
-
-    // Listen for messages from SW
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'SYNC_MARKET_DATA') {
-        refreshMarketData();
-      }
+      console.log('SW registration failed (non-critical):', err);
     });
   }
 }
@@ -308,32 +374,14 @@ function registerServiceWorker() {
 // ===== KEYBOARD SHORTCUTS =====
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    // Close any open modal
-    document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
+    document.querySelectorAll('.modal').forEach(m => { m.style.display = 'none'; });
     hideMoreMenu();
   }
 });
 
-// ===== HANDLE BACK BUTTON =====
-window.addEventListener('popstate', () => {
-  // Handle browser back button
-  hideMoreMenu();
-  document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
-});
-
-// ===== PREVENT ZOOM ON DOUBLE TAP =====
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (e) => {
-  const now = Date.now();
-  if (now - lastTouchEnd <= 300) {
-    e.preventDefault();
-  }
-  lastTouchEnd = now;
-}, false);
-
 // ===== HANDLE ONLINE/OFFLINE =====
 window.addEventListener('online', () => {
-  showToast('Back online! Refreshing data...');
+  showToast('Back online!');
   refreshMarketData();
 });
 

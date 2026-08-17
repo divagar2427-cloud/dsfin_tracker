@@ -499,13 +499,11 @@ input, select, textarea { font-family: inherit; outline: none; }
 
 /* ===== PAGES ===== */
 .page {
-  display: none;
+  /* display controlled by JavaScript inline styles */
   padding: 16px;
-  animation: fadeIn 0.3s ease;
   min-height: calc(100vh - 140px);
+  animation: fadeIn 0.3s ease;
 }
-
-.page.active { display: block; }
 
 .page-header {
   display: flex;
